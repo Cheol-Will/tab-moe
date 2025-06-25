@@ -311,11 +311,6 @@ class TopkRouter(nn.Module):
             dtype=logits.dtype,
             device=logits.device,
         )         
-        # print("Debug", "-"*50)
-        # print(f"full_weights: {full_weights.dtype}, {full_weights.device}")
-        # print(f"top_k_logits: {top_k_logits.dtype}, {top_k_logits.device}")
-        # print(f"top_k_indices: {top_k_indices.dtype}, {top_k_indices.device}")
-        # print(f"top_k_weights: {top_k_weights.dtype}, {top_k_weights.device}")
         full_weights.scatter_(1, top_k_indices, top_k_weights)
 
         return full_weights, top_k_indices # return weights and indices
@@ -354,6 +349,49 @@ class Expert(nn.Module):
         x = self.block(x)
         return x
 
+class MoEBlcokEinSum(nn.Module):
+
+    def __init__(
+        self,
+        d_block: int,
+        moe_ratio: float = 0.25,
+        dropout: float = 0.0,
+        k: int = 4,
+        num_experts: int = 32,
+        activation: str = 'ReLU',
+    ):
+        super(MoEBlcokEinSum, self).__init__()
+        self.router = TopkRouter(d_block, num_experts, k)
+        
+        self.weights1 = nn.Parameter(torch.empty(num_experts, d_block, int(d_block*moe_ratio)))
+        self.act1 = getattr(nn, activation)()
+        self.dropout1 = nn.Dropout(dropout)  
+        self.weights2 = nn.Parameter(torch.empty(num_experts, int(d_block*moe_ratio), d_block))
+        self.act2 = getattr(nn, activation)()
+        self.dropout2 = nn.Dropout(dropout)  
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
+        init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
+
+    def forward(self, x):
+        weights, indices = self.router(x) # (B, E), (B, K)  
+
+        x = torch.einsum("bd,edh->ebh", x, self.weights1) # (E, B, D)
+        x = self.dropout1(self.act1(x))
+        x = torch.einsum("ebh,ehd->ebd", x, self.weights2) # (E, B, D)
+        x = self.dropout2(self.act2(x))
+        x = x.transpose(0, 1) # (B, E, D)
+
+        topk_x = torch.gather(x, 1, indices.unsqueeze(-1).expand(-1, -1, x.size(-1))) # (B, K, D)
+        topk_weights = torch.gather(weights, 1, indices)  # (B, K)
+
+        x = torch.einsum("bkd,bk->bd", topk_x, topk_weights)
+
+        return x 
+    
 class MoEBlock(nn.Module):
     """
     Mixture of Expert Block with routing and experts.
@@ -418,7 +456,7 @@ class MoEMLP(nn.Module):
 
         self.embed = nn.Linear(d_in, d_block)
         self.moe = nn.Sequential(*[
-            MoEBlock(
+            MoEBlcokEinSum(
                 d_block=d_block ,
                 moe_ratio=moe_ratio,
                 dropout=dropout,
