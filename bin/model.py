@@ -113,6 +113,8 @@ class Model(nn.Module):
             # TabM-mini. The adapter is initialized from the normal distribution.
             # This variant was not used in the paper.
             'tabm-mini-normal',
+            # Mixture of Experts (ours)
+            'moe-mlp',
         ],
         k: None | int = None,
         share_training_batches: bool = DEFAULT_SHARE_TRAINING_BATCHES,
@@ -224,6 +226,13 @@ class Model(nn.Module):
                 assert first_adapter_init is None
                 lib.deep.make_efficient_ensemble(self.backbone, lib.deep.NLinear, n=k)
 
+            elif arch_type == "moe-mlp":
+                # add your implementation            
+                # start with most basic one    
+                print(f"Initiailize backbone as {arch_type}")
+                self.backbone = lib.deep.MoE_MLP(d_in=d_flat, **backbone)
+
+
             else:
                 raise ValueError(f'Unknown arch_type: {arch_type}')
 
@@ -232,7 +241,7 @@ class Model(nn.Module):
         d_out = 1 if n_classes is None else n_classes
         self.output = (
             nn.Linear(d_block, d_out)
-            if arch_type == 'plain'
+            if arch_type in ['plain', 'moe-mlp']
             else lib.deep.NLinear(k, d_block, d_out)  # type: ignore[code]
         )
 
@@ -244,7 +253,9 @@ class Model(nn.Module):
     def forward(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None
     ) -> Tensor:
+        # preprocess
         x = []
+        
         if x_num is not None:
             x.append(x_num if self.num_module is None else self.num_module(x_num))
         if x_cat is None:
@@ -252,24 +263,30 @@ class Model(nn.Module):
         else:
             assert self.cat_module is not None
             x.append(self.cat_module(x_cat).float())
-        x = torch.column_stack([x_.flatten(1, -1) for x_ in x])
-
-        if self.k is not None:
-            if self.share_training_batches or not self.training:
-                # (B, D) -> (B, K, D)
-                x = x[:, None].expand(-1, self.k, -1)
+        x = torch.column_stack([x_.flatten(1, -1) for x_ in x]) # (B, F)
+        
+        if self.arch_type != "moe-mlp":
+            if self.k is not None:
+                if self.share_training_batches or not self.training:
+                    # Expand input shape (B, F) -> (B, K, F)
+                    # so that TabM can make k multiple predictions.
+                    x = x[:, None].expand(-1, self.k, -1)
+                else:
+                    # (B * K, F) -> (B, K, F)
+                    x = x.reshape(len(x) // self.k, self.k, *x.shape[1:])
+                if self.minimal_ensemble_adapter is not None:
+                    x = self.minimal_ensemble_adapter(x)
             else:
-                # (B * K, D) -> (B, K, D)
-                x = x.reshape(len(x) // self.k, self.k, *x.shape[1:])
-            if self.minimal_ensemble_adapter is not None:
-                x = self.minimal_ensemble_adapter(x)
+                assert self.minimal_ensemble_adapter is None
         else:
-            assert self.minimal_ensemble_adapter is None
+            # moe
+            # No need to adjust the input shape (B, F)
+            pass
 
-        x = self.backbone(x)
-        x = self.output(x)
-        if self.k is None:
-            # Adjust the output shape for plain networks to make them compatible
+        x = self.backbone(x) # (B, K, F) -> (B, K, D) or (B, F) -> (B, D)
+        x = self.output(x) # (B, 1, D_OUT) or (B, D_OUT)
+        if (self.k is None) or self.arch_type in ['plain', 'moe-mlp']:
+            # Adjust the output shape for plain or moe networks to make them compatible
             # with the rest of the script (loss, metrics, predictions, ...).
             # (B, D_OUT) -> (B, 1, D_OUT)
             x = x[:, None]

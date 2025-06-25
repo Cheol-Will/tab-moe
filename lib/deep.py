@@ -274,6 +274,177 @@ class LinearEfficientEnsemble(nn.Module):
         return x
 
 
+class TopkRouter(nn.Module): 
+    """
+    Gating Network with logits
+    input: (B, F)
+    output: weights for all expert and top-k expert indices (B, num_experts) and (B, K)
+    """
+    def __init__(
+        self,
+        in_features: int,
+        num_experts: int = 32,  
+        k: int = 4,
+    ):
+        super(TopkRouter, self).__init__()
+        self.route_linear = nn.Linear(in_features, num_experts, bias=False)
+        self.k = k
+
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.in_features)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.in_features)
+
+    def forward(self, x):
+        logits = self.route_linear(x) # (B, D) -> (B, num_experts)
+
+        top_k_logits, top_k_indices = torch.topk(logits, self.k, dim=-1) # (B, K)
+        top_k_weights = F.softmax(top_k_logits, dim=-1) # (B, K)
+
+        full_weights = torch.zeros_like(logits) # (B, num_experts) 
+        full_weights.scatter_(1, top_k_indices, top_k_weights)
+
+        return full_weights, top_k_indices # return weights and indices
+
+class Expert(nn.Module):
+    """
+    Expert block with bottleneck.
+    Lin -> ReLU -> Dropout -> Lin -> ReLU -> Dropout
+    """
+
+    def __init__(
+        self,
+        d_block: int,
+        moe_ratio: float = 0.25,
+        dropout: float = 0.0,
+        activation: str = 'ReLU',
+    ):
+        super(Expert, self).__init__()
+        self.block = nn.Sequential(
+            nn.Linear(d_block, int(d_block*moe_ratio)),
+            getattr(nn, activation)(),
+            nn.Dropout(dropout),
+            nn.Linear(int(d_block*moe_ratio), d_block),
+            getattr(nn, activation)(),
+            nn.Dropout(dropout),
+        )
+
+    def reset_parameters(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.d_block)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.d_block)
+
+    def forward(self, x):
+        x = self.block(x)
+        return x
+
+class MoEBlock(nn.Module):
+
+    def __init__(
+        self,
+        d_block: int,
+        moe_ratio: float = 0.25,
+        dropout: float = 0.0,
+        k: int = 4,
+        num_experts: int = 32,
+        activation: str = 'ReLU',
+    ):
+        super(MoEBlock, self).__init__()
+        self.router = TopkRouter(d_block, num_experts, k)
+        self.experts = nn.ModuleList([
+            Expert(d_block, moe_ratio, dropout, activation) for _ in range(num_experts)
+        ])
+        self.k = k
+        self.num_experts = num_experts
+
+    def forward(self, x):
+        assert x.ndim == 2
+        weights, indices = self.router(x) # (B, num_experts), (B, K)
+        out = torch.zeros_like(x.shape[0], self.d_block) # (B, D)
+
+        for idx, expert in enumerate(self.experts):
+            mask = (indices==idx).any(dim=-1) # Boolean mask: (B, )
+            if mask.any():
+                expert_input = x[mask] # (B_i, D)
+                expert_output = expert(expert_input) # (B_i, D)
+                scores = weights[mask, idx].unsqueeze(-1) # (B_i, 1)
+                out[mask] += expert_output * scores # (B_i, D)
+
+        if self.output is not None:
+            out = self.output(out) # (B, d_out)
+
+        return out 
+
+
+class MoEMLP(nn.Module):
+    """
+    MLP MOE
+    """
+    def __init__(
+        self,
+        *,
+        d_in: None | int = None,
+        d_out: None | int = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = 'ReLU', 
+        moe_ratio: float = 0.25, 
+        num_experts: int = 32,  
+        k: int = 4,
+    ) -> None:
+        assert k > 0
+        super(MoEMLP, self).__init__()
+        d_in = d_block if d_in is None else d_in
+
+        self.embed = nn.Lienar(d_in, d_block)
+        self.moe = nn.Sequential(*[
+            MoEBlock(
+                d_block=d_block ,
+                moe_ratio=moe_ratio,
+                dropout=dropout,
+                k=k,
+                num_experts=num_experts,
+                activation=activation,
+            )
+            for _ in range(n_blocks)
+        ])
+        self.output = None if d_out is None else nn.Linear(d_block, d_out)
+
+        self.d_in = d_in
+        self.d_block = d_block
+        self.num_experts = num_experts
+        self.k = k
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+
+        init_rsqrt_uniform_(self.embed.weight, self.d_in)
+        if self.embed.bias is not None:
+            init_rsqrt_uniform_(self.embed.bias, self.d_in)
+
+        # output
+        if self.output is not None:
+            init_rsqrt_uniform_(self.output.weight, self.d_block)
+            if self.output.bias is not None:
+                init_rsqrt_uniform_(self.output.bias, self.d_block)
+
+    def forward(self, x: Tensor) -> Tensor:
+        x = self.embed(x) # (B, F) -> (B, D)
+        x = self.moe(x) # (B, D) -> (B, D)
+
+        if self.output is not None:
+            x = self.output(x) # (B, D) -> (B, d_out) if needed.
+
+        return x
+
 def make_efficient_ensemble(module: nn.Module, EnsembleLayer, **kwargs) -> None:
     """Replace linear layers with efficient ensembles of linear layers.
 
@@ -341,6 +512,7 @@ _CUSTOM_MODULES = {
         rtdl_num_embeddings.PeriodicEmbeddings,
         PiecewiseLinearEmbeddings,
         MLP,
+        MoEMLP,
     ]
 }
 

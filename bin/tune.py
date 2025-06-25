@@ -28,7 +28,13 @@ from lib.util import KWArgs
 
 
 def _suggest(trial: optuna.trial.Trial, distribution: str, label: str, *args):
-    return getattr(trial, f'suggest_{distribution}')(label, *args)
+
+    if distribution == "float":
+        # for moe_ratio
+        low, high, step = args
+        return trial.suggest_float(label, low, high, step=step)
+    else:
+        return getattr(trial, f'suggest_{distribution}')(label, *args)
 
 
 def sample_config(
@@ -152,6 +158,7 @@ def main(
         timer = delu.tools.Timer()
 
     def objective(trial: optuna.trial.Trial) -> float:
+        # print(f"objective {config['space']}")
         trial_config = sample_config(trial, config['space'], [])
         kwargs = {}
 
