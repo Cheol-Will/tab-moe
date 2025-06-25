@@ -304,8 +304,18 @@ class TopkRouter(nn.Module):
 
         top_k_logits, top_k_indices = torch.topk(logits, self.k, dim=-1) # (B, K)
         top_k_weights = F.softmax(top_k_logits, dim=-1) # (B, K)
+        top_k_weights = top_k_weights.to(logits.dtype)
 
-        full_weights = torch.zeros_like(logits) # (B, num_experts) 
+        full_weights = torch.zeros(
+            logits.size(),
+            dtype=logits.dtype,
+            device=logits.device,
+        )         
+        # print("Debug", "-"*50)
+        # print(f"full_weights: {full_weights.dtype}, {full_weights.device}")
+        # print(f"top_k_logits: {top_k_logits.dtype}, {top_k_logits.device}")
+        # print(f"top_k_indices: {top_k_indices.dtype}, {top_k_indices.device}")
+        # print(f"top_k_weights: {top_k_weights.dtype}, {top_k_weights.device}")
         full_weights.scatter_(1, top_k_indices, top_k_weights)
 
         return full_weights, top_k_indices # return weights and indices
@@ -345,7 +355,10 @@ class Expert(nn.Module):
         return x
 
 class MoEBlock(nn.Module):
-
+    """
+    Mixture of Expert Block with routing and experts.
+    Each expert is a two-layer MLP.
+    """
     def __init__(
         self,
         d_block: int,
@@ -362,11 +375,12 @@ class MoEBlock(nn.Module):
         ])
         self.k = k
         self.num_experts = num_experts
+        self.d_block = d_block
 
     def forward(self, x):
         assert x.ndim == 2
         weights, indices = self.router(x) # (B, num_experts), (B, K)
-        out = torch.zeros_like(x.shape[0], self.d_block) # (B, D)
+        out = torch.zeros(x.shape[0], self.d_block, dtype=x.dtype, device=x.device) # (B, D)
 
         for idx, expert in enumerate(self.experts):
             mask = (indices==idx).any(dim=-1) # Boolean mask: (B, )
@@ -376,8 +390,7 @@ class MoEBlock(nn.Module):
                 scores = weights[mask, idx].unsqueeze(-1) # (B_i, 1)
                 out[mask] += expert_output * scores # (B_i, D)
 
-        if self.output is not None:
-            out = self.output(out) # (B, d_out)
+        # indices should be printed or saved for statistics.
 
         return out 
 
@@ -403,7 +416,7 @@ class MoEMLP(nn.Module):
         super(MoEMLP, self).__init__()
         d_in = d_block if d_in is None else d_in
 
-        self.embed = nn.Lienar(d_in, d_block)
+        self.embed = nn.Linear(d_in, d_block)
         self.moe = nn.Sequential(*[
             MoEBlock(
                 d_block=d_block ,

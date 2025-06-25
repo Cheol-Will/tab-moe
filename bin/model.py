@@ -170,7 +170,10 @@ class Model(nn.Module):
         # >>> Backbone
         d_flat = d_num + d_cat
         self.minimal_ensemble_adapter = None
-        self.backbone = lib.deep.make_module(d_in=d_flat, **backbone)
+        if arch_type == 'moe-mlp':
+            self.backbone = None
+        else: 
+            self.backbone = lib.deep.make_module(d_in=d_flat, **backbone)
 
         if arch_type != 'plain':
             assert k is not None
@@ -230,8 +233,7 @@ class Model(nn.Module):
                 # add your implementation            
                 # start with most basic one    
                 print(f"Initiailize backbone as {arch_type}")
-                self.backbone = lib.deep.MoE_MLP(d_in=d_flat, **backbone)
-
+                self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
 
             else:
                 raise ValueError(f'Unknown arch_type: {arch_type}')
