@@ -353,16 +353,16 @@ class ModelMoE(nn.Module):
         self.minimal_ensemble_adapter = None
 
         print(f"Initiailize backbone as {arch_type}")
-        self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
+        if arch_type == "moe-mlp":
+            self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
+        elif arch_type == "moe-sparse-shared":
+            self.backbone = lib.deep.SparseSharedMoE(d_in=d_flat, **backbone)
 
         # >>> Output
         d_block = backbone['d_block']
         d_out = 1 if n_classes is None else n_classes
-        self.output = (
-            nn.Linear(d_block, d_out)
-            if arch_type in ['plain', 'moe-mlp']
-            else lib.deep.NLinear(k, d_block, d_out)  # type: ignore[code]
-        )
+        self.output = nn.Linear(d_block, d_out)
+
 
         # >>>
         self.arch_type = arch_type

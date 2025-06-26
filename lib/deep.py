@@ -432,7 +432,6 @@ class MoEBlock(nn.Module):
 
         return out 
 
-
 class MoEMLP(nn.Module):
     """
     MLP MOE
@@ -495,6 +494,81 @@ class MoEMLP(nn.Module):
             x = self.output(x) # (B, D) -> (B, d_out) if needed.
 
         return x
+
+class SparseSharedMoE(nn.Module):
+    """
+    Sparse shared mixture of expert extends the SparseMoE 
+    by including additional experts that are shared across all samples.
+    """
+
+    def __init__(
+        self,
+        *,
+        d_in: None | int = None,
+        d_out : None | int = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = "ReLU", 
+        moe_ratio: float = 0.25, 
+        num_experts: int = 32,
+        k: int = 4,
+    ) -> None:
+        assert k > 0
+
+        self.embed = nn.Linear(d_in, d_block)
+        self.moe = nn.ModuleList(*[
+            MoEBlcokEinSum(
+                d_block=d_block ,
+                moe_ratio=moe_ratio,
+                dropout=dropout,
+                k=k,
+                num_experts=num_experts,
+                activation=activation,
+            )
+            for _ in range(n_blocks)
+        ])
+
+        self.shared_expert = nn.ModuleList(*[
+            nn.Sequential(
+                nn.Linear(d_block, d_block),
+                getattr(nn.activation)(),
+                nn.Dropout(dropout),
+                nn.Linear(d_block, d_block),
+                getattr(nn.activation)(),
+                nn.Dropout(dropout),
+            )
+            for _ in range(n_blocks)
+        ])
+
+        self.output = None if d_out is None else nn.Linear(d_block, d_out)
+        self.d_in = d_in
+        self.d_block = d_block
+        self.n_blocks = n_blocks
+        self.num_experts = num_experts
+        self.k = k
+
+    def reset_parameters(self) -> None:
+
+        init_rsqrt_uniform_(self.embed.weight, self.d_in)
+        if self.embed.bias is not None:
+            init_rsqrt_uniform_(self.embed.bias, self.d_in)
+        
+        if self.output is not None:
+            init_rsqrt_uniform_(self.output.weight, self.d_block)
+            if self.output.bias is not None:
+                init_rsqrt_uniform_(self.output.bias, self.d_block)
+
+    def forward(self, x):
+        x = self.embed(x) # (B, F) -> (B, D)
+        for i in range(self.n_blocks):
+            x = self.moe[i](x) + self.shared_expert[i](x) # (B, D)
+        
+        if self.output is not None:
+            x = self.output(x) # (B, D) -> (B, d_out) if needed.
+
+        return x
+
 
 def make_efficient_ensemble(module: nn.Module, EnsembleLayer, **kwargs) -> None:
     """Replace linear layers with efficient ensembles of linear layers.
