@@ -35,12 +35,17 @@ weight_decay = [
 ]
 
 [space.model]
-arch_type = "tabm"
-k = 32
+arch_type = "moe-mlp"
 share_training_batches = false
 
 [space.model.backbone]
-type = "MLP"
+type = "MoEMLP"
+k = [
+    "_tune_",
+    "int",
+    1,
+    4,
+]
 n_blocks = [
     "_tune_",
     "int",
@@ -60,4 +65,18 @@ dropout = [
     0.0,
     0.0,
     0.5,
+]
+moe_ratio = [
+    "_tune_",
+    "float",
+    0.25,
+    4.0,
+    0.25,
+]
+num_experts = [
+    "_tune_",
+    "int",
+    16,
+    64,
+    16,
 ]
