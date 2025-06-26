@@ -114,7 +114,7 @@ class Model(nn.Module):
             # This variant was not used in the paper.
             'tabm-mini-normal',
             # Mixture of Experts (ours)
-            'moe-mlp',
+            # 'moe-mlp',
         ],
         k: None | int = None,
         share_training_batches: bool = DEFAULT_SHARE_TRAINING_BATCHES,
@@ -229,11 +229,11 @@ class Model(nn.Module):
                 assert first_adapter_init is None
                 lib.deep.make_efficient_ensemble(self.backbone, lib.deep.NLinear, n=k)
 
-            elif arch_type == "moe-mlp":
-                # add your implementation            
-                # start with most basic one    
-                print(f"Initiailize backbone as {arch_type}")
-                self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
+            # elif arch_type == "moe-mlp":
+            #     # add your implementation            
+            #     # start with most basic one    
+            #     print(f"Initiailize backbone as {arch_type}")
+            #     self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
 
             else:
                 raise ValueError(f'Unknown arch_type: {arch_type}')
@@ -294,6 +294,101 @@ class Model(nn.Module):
             x = x[:, None]
         return x
 
+
+
+
+class ModelMoE(nn.Module):
+    """MoE"""
+    def __init__(
+        self,
+        *,
+        n_num_features: int,
+        cat_cardinalities: list[int],
+        n_classes: None | int,
+        backbone: dict,
+        bins: None | list[Tensor],  # For piecewise-linear encoding/embeddings.
+        num_embeddings: None | dict = None,
+        arch_type: str = "moe-mlp",
+        k: None | int  = None,
+    ) -> None:
+        assert n_num_features >= 0
+        assert n_num_features or cat_cardinalities
+        super().__init__()
+
+            # >>> Continuous (numerical) features
+        first_adapter_sections = []  # See the comment in `_init_first_adapter`.
+
+        if n_num_features == 0:
+            assert bins is None
+            self.num_module = None
+            d_num = 0
+
+        elif num_embeddings is None:
+            assert bins is None
+            self.num_module = None
+            d_num = n_num_features
+            first_adapter_sections.extend(1 for _ in range(n_num_features))
+
+        else:
+            if bins is None:
+                self.num_module = lib.deep.make_module(
+                    **num_embeddings, n_features=n_num_features
+                )
+            else:
+                assert num_embeddings['type'].startswith('PiecewiseLinearEmbeddings')
+                self.num_module = lib.deep.make_module(**num_embeddings, bins=bins)
+            d_num = n_num_features * num_embeddings['d_embedding']
+            first_adapter_sections.extend(
+                num_embeddings['d_embedding'] for _ in range(n_num_features)
+            )
+
+        # >>> Categorical features
+        self.cat_module = (
+            lib.deep.OneHotEncoding0d(cat_cardinalities) if cat_cardinalities else None
+        )
+        first_adapter_sections.extend(cat_cardinalities)
+        d_cat = sum(cat_cardinalities)
+
+        d_flat = d_num + d_cat
+        self.minimal_ensemble_adapter = None
+
+        print(f"Initiailize backbone as {arch_type}")
+        self.backbone = lib.deep.MoEMLP(d_in=d_flat, **backbone)
+
+        # >>> Output
+        d_block = backbone['d_block']
+        d_out = 1 if n_classes is None else n_classes
+        self.output = (
+            nn.Linear(d_block, d_out)
+            if arch_type in ['plain', 'moe-mlp']
+            else lib.deep.NLinear(k, d_block, d_out)  # type: ignore[code]
+        )
+
+        # >>>
+        self.arch_type = arch_type
+        self.k = k
+
+
+    def forward(
+        self, x_num: None | Tensor = None, x_cat: None | Tensor = None
+    ) -> Tensor:
+        # preprocess
+        x = []
+        
+        if x_num is not None:
+            x.append(x_num if self.num_module is None else self.num_module(x_num))
+        if x_cat is None:
+            assert self.cat_module is None
+        else:
+            assert self.cat_module is not None
+            x.append(self.cat_module(x_cat).float())
+        x = torch.column_stack([x_.flatten(1, -1) for x_ in x]) # (B, F)
+        
+        x = self.backbone(x) # (B, K, F) -> (B, K, D) or (B, F) -> (B, D)
+        x = self.output(x) # (B, 1, D_OUT) or (B, D_OUT)
+        x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
+
+        return x        
 
 class Config(TypedDict):
     seed: int
@@ -418,13 +513,27 @@ def main(
         logger.info(f'Bin counts: {[len(x) - 1 for x in bin_edges]}')
     else:
         bin_edges = None
-    model = Model(
-        n_num_features=dataset.n_num_features,
-        cat_cardinalities=dataset.compute_cat_cardinalities(),
-        n_classes=dataset.task.try_compute_n_classes(),
-        **config['model'],
-        bins=bin_edges,
-    )
+
+    # branching for custom model
+    if config['model']['arch_type'] == 'moe-mlp':
+        print("Debug", "=" * 50)
+        print(f"Init Model MoE with {config['model']['arch_type']}" )
+        print(f"Init Model MoE with {config['model']}" )
+        model = ModelMoE(
+            n_num_features=dataset.n_num_features,
+            cat_cardinalities=dataset.compute_cat_cardinalities(),
+            n_classes=dataset.task.try_compute_n_classes(),
+            **config['model'],
+            bins=bin_edges,            
+        )
+    else:
+        model = Model(
+            n_num_features=dataset.n_num_features,
+            cat_cardinalities=dataset.compute_cat_cardinalities(),
+            n_classes=dataset.task.try_compute_n_classes(),
+            **config['model'],
+            bins=bin_edges,
+        )
     report['n_parameters'] = lib.deep.get_n_parameters(model)
     logger.info(f'n_parameters = {report["n_parameters"]}')
     report['prediction_type'] = 'labels' if dataset.task.is_regression else 'probs'
