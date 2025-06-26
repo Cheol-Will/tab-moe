@@ -515,9 +515,12 @@ class SparseSharedMoE(nn.Module):
         k: int = 4,
     ) -> None:
         assert k > 0
+        super(SparseSharedMoE, self).__init__()
+
+        d_in = d_block if d_in is None else d_in
 
         self.embed = nn.Linear(d_in, d_block)
-        self.moe = nn.ModuleList(*[
+        self.moe = nn.ModuleList([
             MoEBlcokEinSum(
                 d_block=d_block ,
                 moe_ratio=moe_ratio,
@@ -529,13 +532,13 @@ class SparseSharedMoE(nn.Module):
             for _ in range(n_blocks)
         ])
 
-        self.shared_expert = nn.ModuleList(*[
+        self.shared_expert = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(d_block, d_block),
-                getattr(nn.activation)(),
+                getattr(nn, activation)(),
                 nn.Dropout(dropout),
                 nn.Linear(d_block, d_block),
-                getattr(nn.activation)(),
+                getattr(nn, activation)(),
                 nn.Dropout(dropout),
             )
             for _ in range(n_blocks)

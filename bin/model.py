@@ -515,7 +515,7 @@ def main(
         bin_edges = None
 
     # branching for custom model
-    if config['model']['arch_type'] == 'moe-mlp':
+    if config['model']['arch_type'] in ['moe-mlp', 'moe-sparse-shared']:
         print("Debug", "=" * 50)
         print(f"Init Model MoE with {config['model']['arch_type']}" )
         print(f"Init Model MoE with {config['model']}" )
