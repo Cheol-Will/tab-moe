@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-src_type="mlp"
+src_type="tabm"
 arch_type="moe-mlp"
-data_list=("adult" "black-friday")
+# data_list=("adult" "black-friday")
 # data_list=("california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto" "tabred" "why")
-# data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto" "tabred" "why")
+data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto" "tabred" "why")
 
 for dataset in "${data_list[@]}"
 do
