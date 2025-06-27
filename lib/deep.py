@@ -419,7 +419,7 @@ class MoEBlock(nn.Module):
         self.num_experts = num_experts
         self.d_block = d_block
 
-    def forward(self, x):
+    def forward(self, x, return_route = None):
         assert x.ndim == 2
         weights, indices = self.router(x) # (B, num_experts), (B, K)
         out = torch.zeros(x.shape[0], self.d_block, dtype=x.dtype, device=x.device) # (B, D)
@@ -433,8 +433,10 @@ class MoEBlock(nn.Module):
                 out[mask] += expert_output * scores # (B_i, D)
 
         # indices should be printed or saved for statistics.
-
-        return out 
+        if return_route:
+            return out, indices # return routing if needed
+        else:
+            return out 
 
 class MoEMLP(nn.Module):
     """
@@ -458,7 +460,7 @@ class MoEMLP(nn.Module):
         d_in = d_block if d_in is None else d_in
 
         self.embed = nn.Linear(d_in, d_block)
-        self.moe = nn.Sequential(*[
+        self.moe = nn.ModuleList([
             MoEBlcokEinSum(
                 d_block=d_block ,
                 moe_ratio=moe_ratio,
@@ -490,14 +492,25 @@ class MoEMLP(nn.Module):
             if self.output.bias is not None:
                 init_rsqrt_uniform_(self.output.bias, self.d_block)
 
-    def forward(self, x: Tensor) -> Tensor:
+    def forward(self, x: Tensor, return_route = False) -> Tensor:
         x = self.embed(x) # (B, F) -> (B, D)
-        x = self.moe(x) # (B, D) -> (B, D)
 
+        for i in range(self.n_blocks):
+            if (i == 0) and return_route:
+                # return the routing result if needed in the first block.
+                out, route = self.moe[i](x, return_route)
+                x = out + self.shared_expert[i](x)
+            else:
+                # perform moe + shared expert for the rest of the blocks.
+                x = self.moe[i](x) + self.shared_expert[i](x) # (B, D)
+        
         if self.output is not None:
             x = self.output(x) # (B, D) -> (B, d_out) if needed.
 
-        return x
+        if return_route:
+            return x, route # return the routing result from the first block. 
+        else:
+            return x
 
 class SparseSharedMoE(nn.Module):
     """
@@ -566,15 +579,24 @@ class SparseSharedMoE(nn.Module):
             if self.output.bias is not None:
                 init_rsqrt_uniform_(self.output.bias, self.d_block)
 
-    def forward(self, x):
+    def forward(self, x, return_route = False):
         x = self.embed(x) # (B, F) -> (B, D)
         for i in range(self.n_blocks):
-            x = self.moe[i](x) + self.shared_expert[i](x) # (B, D)
+            if (i == 0) and return_route:
+                # return the routing result if needed in the first block.
+                out, route = self.moe[i](x, return_route)
+                x = out + self.shared_expert[i](x)
+            else:
+                # perform moe + shared expert for the rest of the blocks.
+                x = self.moe[i](x) + self.shared_expert[i](x) # (B, D)
         
         if self.output is not None:
             x = self.output(x) # (B, D) -> (B, d_out) if needed.
 
-        return x
+        if return_route:
+            return x, route # return the routing result from the first block. 
+        else:
+            return x
 
 
 def make_efficient_ensemble(module: nn.Module, EnsembleLayer, **kwargs) -> None:

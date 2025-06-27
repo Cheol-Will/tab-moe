@@ -16,7 +16,7 @@ if __name__ == '__main__':
 
 import lib
 
-DEFAULT_N_SEEDS = 15
+DEFAULT_N_SEEDS = 1
 
 
 def main(
@@ -36,7 +36,7 @@ def main(
         assert (path / 'DONE').exists()
         from_tuning = True
         tuning_report = lib.load_report(path)
-        function_qualname = tuning_report['config']['function'] #"bin.model.main"
+        function_qualname = tuning_report['config']['function'] # "bin.model.main"
         template_config = tuning_report['best']['config']
         evaluation_dir = path.with_name(path.name.replace('tuning', 'evaluation'))
         evaluation_dir.mkdir(exist_ok=True)
@@ -53,10 +53,14 @@ def main(
     del path
 
     # train and evaluate with given configs
-    function_ = lib.import_(function_qualname)
+    # function_ = lib.import_(function_qualname)
+    function_ = lib.import_("bin.model_load_balance.main")
     for seed in range(n_seeds):
         output = evaluation_dir / str(seed)
         config_path = output.with_suffix('.toml') 
+        print(output)
+        print(config_path)
+        return
         done = (output / 'DONE').exists()
         if config_path.exists() and not done:
             if output.exists():
@@ -76,7 +80,11 @@ def main(
         try:
             if (from_tuning or seed > 0) and not (config_path.exists() and done):
                 lib.dump_config(output, config)
-            function_(config, output, force=force) # train-eval-test
+            # function_(config, output, force=force) # bin.model.main: train-eval-test
+            print(output)
+            function_(config, output, force=force) # call bin.model_load_balance.main()
+
+
         except Exception:
             if from_tuning or seed > 0:
                 config_path.unlink(True)

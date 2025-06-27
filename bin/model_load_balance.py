@@ -452,6 +452,11 @@ def main(
 ) -> None | lib.JSONDict:
     # >>> Start
     config, output = lib.check(config, output, config_type=Config)
+    print("Debug", '-'*50)
+    print(config)
+    print(output)
+
+    return 
     if not lib.start(output, force=force):
         return None
 
@@ -531,17 +536,19 @@ def main(
             bins=bin_edges,            
         )
     else:
-        model = Model(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
-            **config['model'],
-            bins=bin_edges,
-        )
+        raise ValueError(f"arch_type is {config['model']['arch_type']}, which is not available.")
+
+    model.load_state_dict()
+    path = "exp/moe-sparse-shared-piecewiselinear/churn/0-evaluation/0/"
+    ckpt = lib.load_checkpoint(path)
+    model.load_state_dict(lib.load_checkpoint(path)['model'])
+    
+    
     report['n_parameters'] = lib.deep.get_n_parameters(model)
     logger.info(f'n_parameters = {report["n_parameters"]}')
     report['prediction_type'] = 'labels' if dataset.task.is_regression else 'probs'
     model.to(device)
+    
     if lib.is_dataparallel_available():
         model = nn.DataParallel(model)
 
@@ -617,14 +624,22 @@ def main(
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
     def apply_model(part: PartKey, idx: Tensor) -> Tensor:
-        return (
-            model(
+        pred, route = model(
                 dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
                 dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
-            )
-            .squeeze(-1)  # Remove the last dimension for regression predictions.
-            .float()
+                return_route=True
         )
+
+        pred = pred.squeeze(-1).float()
+        return pred, route
+        # return (
+        #     model(
+        #         dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
+        #         dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
+        #     )
+        #     .squeeze(-1)  # Remove the last dimension for regression predictions.
+        #     .float()
+        # )
 
     @evaluation_mode()
     def evaluate(
@@ -634,21 +649,20 @@ def main(
     ]:
         model.eval()
         head_predictions: dict[PartKey, np.ndarray] = {}
+        head_route: dict[PartKey, np.ndarray] = {}
         for part in parts:
             while eval_batch_size:
                 try:
-                    head_predictions[part] = (
-                        torch.cat(
-                            [
-                                apply_model(part, idx)
-                                for idx in torch.arange(
-                                    dataset.size(part), device=device
-                                ).split(eval_batch_size)
-                            ]
-                        )
-                        .cpu()
-                        .numpy()
-                    )
+                    temp_pred, temp_route = [], []
+                    for idx in torch.arange(dataset.size(part), device=device).split(eval_batch_size):
+                        pred, route = apply_model(part, idx)
+                        temp_pred.append(pred) 
+                        temp_route.append(route)
+                    result_pred = torch.cat(temp_pred)
+                    result_route = torch.cat(temp_route)
+
+                    head_predictions[part] = result_pred
+                    head_route[part] = result_route
                 except RuntimeError as err:
                     if not lib.is_oom_exception(err):
                         raise
@@ -678,7 +692,7 @@ def main(
             if lib.are_valid_predictions(predictions)
             else {x: {'score': lib.WORST_SCORE} for x in predictions}
         )
-        return metrics, predictions, head_predictions, eval_batch_size
+        return metrics, predictions, head_predictions, eval_batch_size, head_route
 
     def save_checkpoint() -> None:
         lib.dump_checkpoint(
@@ -701,225 +715,21 @@ def main(
         lib.dump_report(output, report)
         lib.backup_output(output)
 
-    print()
-    timer.run()
-    while config['n_epochs'] == -1 or step // epoch_size < config['n_epochs']:
-        print(f'[...] {lib.try_get_relative_path(output)} | {timer}')
-
-        model.train()
-        epoch_losses = []
-        batches = (
-            torch.randperm(
-                dataset.size('train'),
-                generator=batch_generator,
-                device=device,
-            ).split(batch_size)
-            if share_training_batches
-            else [
-                x.transpose(0, 1).flatten()
-                for x in torch.rand(
-                    (config['model']['k'], dataset.size('train')),
-                    generator=batch_generator,
-                    device=device,
-                )
-                .argsort(dim=1)
-                .split(batch_size, dim=1)
-            ]
-        )
-        for batch_idx in tqdm(batches, desc=f'Epoch {step // epoch_size} Step {step}'):
-            optimizer.zero_grad()
-            loss = loss_fn(apply_model('train', batch_idx), Y_train[batch_idx])
-            if grad_scaler is None:
-                loss.backward()
-            else:
-                grad_scaler.scale(loss).backward()
-
-            if parameter_statistics and (
-                step % epoch_size == 0  # The first batch of the epoch.
-                or step // epoch_size == 0  # The first epoch.
-            ):
-                for k, v in lib.deep.compute_parameter_stats(model).items():
-                    writer.add_scalars(k, v, step, timer.elapsed())
-                    del k, v
-
-            if gradient_clipping_norm is not None:
-                if grad_scaler is not None:
-                    grad_scaler.unscale_(optimizer)
-                nn.utils.clip_grad.clip_grad_norm_(
-                    model.parameters(), gradient_clipping_norm
-                )
-            if grad_scaler is None:
-                optimizer.step()
-            else:
-                grad_scaler.step(optimizer)
-                grad_scaler.update()
-
-            step += 1
-            epoch_losses.append(loss.detach())
-
-        epoch_losses = torch.stack(epoch_losses).tolist()
-        mean_loss = statistics.mean(epoch_losses)
-        metrics, predictions, _, eval_batch_size = evaluate(
-            ['val', 'test'], eval_batch_size
-        )
-
-        training_log.append(
-            {'epoch-losses': epoch_losses, 'metrics': metrics, 'time': timer.elapsed()}
-        )
-        lib.print_metrics(mean_loss, metrics)
-        writer.add_scalars('loss', {'train': mean_loss}, step, timer.elapsed())
-        for part in metrics:
-            writer.add_scalars(
-                'score', {part: metrics[part]['score']}, step, timer.elapsed()
-            )
-
-        if (
-            'metrics' not in report
-            or metrics['val']['score'] > report['metrics']['val']['score']
-        ):
-            print('🌸 New best epoch! 🌸')
-            report['best_step'] = step
-            report['metrics'] = metrics
-            save_checkpoint()
-            lib.dump_predictions(output, predictions)
-
-        early_stopping.update(metrics['val']['score'])
-        if early_stopping.should_stop() or not lib.are_valid_predictions(predictions):
-            break
-
-        print()
-    report['time'] = str(timer)
-
+    
     # >>>
     if lib.get_checkpoint_path(output).exists():
         model.load_state_dict(lib.load_checkpoint(output)['model'])
-    report['metrics'], predictions, head_predictions, _ = evaluate(
+    report['metrics'], predictions, head_predictions, eval_batch_size, head_route = evaluate(
         ['train', 'val', 'test'], eval_batch_size
     )
     report['chunk_size'] = chunk_size
     report['eval_batch_size'] = eval_batch_size
+    
     lib.dump_predictions(output, predictions)
     lib.dump_summary(output, lib.summarize(report))
-    save_checkpoint()
+    lib.dum_route()
+    save_checkpoint(output, head_route)
 
-    # >>> Submodel selection (TabM[B] & TabM[G]).
-    if (
-        config.get('head_selection', True)
-        and head_predictions['train'].shape[1] > 1
-        # The following conditions is a hack preventing the head selection during
-        # the hyperparameter tuning, because bin/tune.py runs training
-        # outside of the project directory.
-        and lib.env.get_project_dir() in output.parents
-        and output.parent.name != 'trials'
-    ):
-        if output.parent.name.endswith('-evaluation'):
-            best_head_output = (
-                output.parent.with_name(
-                    output.parent.name.removesuffix('-evaluation')
-                    + '-best-head-evaluation'
-                )
-                / output.name
-            )
-            greedy_heads_output = (
-                output.parent.with_name(
-                    output.parent.name.removesuffix('-evaluation')
-                    + '-greedy-heads-evaluation'
-                )
-                / output.name
-            )
-        else:
-            best_head_output = output.with_name(output.name + '-best-head')
-            greedy_heads_output = output.with_name(output.name + '-greedy-heads')
-        for dir_ in [best_head_output, greedy_heads_output]:
-            if dir_.exists():
-                logger.warning(f'Removing the existing output: {dir_}')
-                shutil.rmtree(dir_)
-
-        prediction_type = (
-            lib.PredictionType.PROBS
-            if dataset.task.is_classification
-            else lib.PredictionType.LABELS
-        )
-        head_selection_timer = delu.tools.Timer()
-        head_selection_timer.run()
-
-        # >>> TabM[B]: select the Best submodel.
-        n_heads = head_predictions['val'].shape[1]
-        head_val_scores = np.array(
-            [
-                dataset.task.calculate_metrics(
-                    {'val': head_predictions['val'][:, i]}, prediction_type
-                )['val']['score']
-                for i in range(n_heads)
-            ]
-        )
-        best_head_idx = int(np.argmax(head_val_scores))
-        best_head_output.mkdir(parents=True)
-        lib.finish(
-            best_head_output,
-            report
-            | {
-                'heads': [best_head_idx],
-                'head_selection_time': str(head_selection_timer),
-                'metrics': dataset.task.calculate_metrics(
-                    {k: v[:, best_head_idx] for k, v in head_predictions.items()},
-                    prediction_type,
-                ),
-            },
-        )
-
-        # >>> TabM[G]: Greedily select a powerful subset of submodels.
-
-        # Start with the best head.
-        greedy_idx = [best_head_idx]
-        greedy_score = head_val_scores[best_head_idx]
-
-        greedy_mask = [False] * n_heads
-        greedy_mask[best_head_idx] = True
-
-        while len(greedy_idx) < n_heads:
-            new_idx = None
-            new_score = None
-
-            # Iterating through all heads.
-            for head_idx in range(n_heads):
-                # If the head is already in greedy_idx, skip it.
-                if greedy_mask[head_idx]:
-                    continue
-
-                candidate_idx = [*greedy_idx, head_idx]
-                candidate_score = dataset.task.calculate_metrics(
-                    {'val': head_predictions['val'][:, candidate_idx].mean(1)},
-                    prediction_type,
-                )['val']['score']
-                if candidate_score > greedy_score and (
-                    new_score is None or candidate_score > new_score
-                ):
-                    new_idx = candidate_idx
-                    new_score = candidate_score
-
-            # If no head improves the current greedy score,
-            # the head selection process is stopped.
-            if new_idx is None:
-                break
-            else:
-                assert new_score is not None
-                greedy_score = new_score
-                greedy_idx = new_idx
-
-        greedy_heads_output.mkdir(parents=True)
-        lib.finish(
-            greedy_heads_output,
-            report
-            | {
-                'heads': greedy_idx,
-                'head_selection_time': str(head_selection_timer),
-                'metrics': dataset.task.calculate_metrics(
-                    {k: v[:, greedy_idx].mean(1) for k, v in head_predictions.items()},
-                    prediction_type,
-                ),
-            },
-        )
 
     lib.finish(output, report)
     return report
