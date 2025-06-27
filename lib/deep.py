@@ -478,6 +478,7 @@ class MoEMLP(nn.Module):
 
         self.d_in = d_in
         self.d_block = d_block
+        self.n_blocks = n_blocks
         self.num_experts = num_experts
         self.k = k
 
@@ -501,11 +502,10 @@ class MoEMLP(nn.Module):
         for i in range(self.n_blocks):
             if (i == 0) and return_route:
                 # return the routing result if needed in the first block.
-                out, route = self.moe[i](x, return_route)
-                x = out + self.shared_expert[i](x)
+                x, route = self.moe[i](x) # (B, D)
             else:
                 # perform moe + shared expert for the rest of the blocks.
-                x = self.moe[i](x) + self.shared_expert[i](x) # (B, D)
+                x = self.moe[i](x) # (B, D)
         
         if self.output is not None:
             x = self.output(x) # (B, D) -> (B, d_out) if needed.

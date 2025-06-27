@@ -1,6 +1,5 @@
 import json
 from pathlib import Path
-
 import pandas as pd
 
 def get_dataset_name(dataset_path: str) -> str:
@@ -17,44 +16,13 @@ def get_dataset_name(dataset_path: str) -> str:
         else name
     )
 
-model_list = [
-    'tabm', 
-    'tabm-piecewiselinear', 
-    'moe-sparse-shared', 
-    'moe-sparse-shared-piecewiselinear',
-    'moe-mlp'
-]
-
-for model in model_list:
-        
-    # model = 'moe-mlp' 
-
-    # Load all training runs.
-    df = pd.json_normalize([
-        json.loads(x.read_text())
-        for x in Path('exp').glob(f'{model}/**/0-evaluation/*/report.json')
-    ])
-    df['Dataset'] = df['config.data.path'].map(get_dataset_name)
-
-    # Aggregate the results over the random seeds.
-    print(model, '-'*50)
-    print(df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std']))
-
-
-model_list = [
-    'moe-sparse-shared', 
-    'moe-sparse-shared-piecewiselinear',
-    'moe-mlp'
-]
-
-for model in model_list:
+def print_hyperparameters(model):
     df = pd.json_normalize([
         json.loads(x.read_text())
         for x in Path('exp').glob(f'{model}/**/0-tuning/report.json')
     ])
     df['Dataset'] = df['best.config.data.path'].map(get_dataset_name)
     df.index = df['Dataset']
-
     hyperparameters = [
         'k',
         'n_blocks',
@@ -67,4 +35,57 @@ for model in model_list:
     print(model, '-'*50)
     print(df[cols])
 
+def print_tuning_time(model):
+    df = pd.json_normalize([
+        json.loads(x.read_text())
+        for x in Path('exp').glob(f'{model}/**/0-tuning/report.json')
+    ])
+    df['Dataset'] = df['best.config.data.path'].map(get_dataset_name)
+    df.index = df['Dataset']
+    df = df.sort_index()
+    idx = [
+        "adult", "black-friday", "california", "churn", "covtype2", "diamond", 
+        "higgs-small", "house", "microsoft", "otto",  
+    ]
+    print(model, '-'*50)
+    print(df.loc[idx, "time"])
+    df = df.loc[idx, "time"]
+    df.to_csv(f"seraching_time_{model}.csv")
 
+def print_metrics(model):
+    # Load all training runs.
+    df = pd.json_normalize([
+        json.loads(x.read_text())
+        for x in Path('exp').glob(f'{model}/**/0-evaluation/*/report.json')
+    ])
+    df['Dataset'] = df['config.data.path'].map(get_dataset_name)
+
+    # Aggregate the results over the random seeds.
+    print(model, '-'*50)
+    print(df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std']))
+
+def main():
+    model_list = [
+        'tabm', 
+        'tabm-piecewiselinear', 
+        'moe-sparse-shared', 
+        'moe-sparse-shared-piecewiselinear',
+        'moe-mlp'
+    ]
+
+    for model in model_list:
+        print_metrics(model)
+
+    model_list = [
+        'moe-sparse-shared', 
+        'moe-sparse-shared-piecewiselinear',
+        'moe-mlp'
+    ]
+    for model in model_list:
+        print_hyperparameters(model)
+
+    print_tuning_time("tabm")
+
+
+if __name__ == "__main__":
+    main()

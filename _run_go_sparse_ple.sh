@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 
+# covtype2 takes 19 hours
 arch_type="moe-sparse-shared-piecewiselinear"
-data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")
+data_list=("adult" "black-friday" "california" "churn" "diamond" "higgs-small" "house" "microsoft" "otto"  "covtype2")
 # data="adult"
 
 for data in "${data_list[@]}"
