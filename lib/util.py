@@ -169,6 +169,8 @@ def start(output: str | Path, *, continue_: bool = False, force: bool = False) -
             return True
         elif not continue_:
             backup_output(output)
+            logger.warning(f'The output {output} already exists!')
+            # print()
             logger.warning('The output already exists!')
             return False
         elif output.joinpath('DONE').exists():

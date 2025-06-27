@@ -380,7 +380,7 @@ class MoEBlcokEinSum(nn.Module):
         init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
         init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
 
-    def forward(self, x):
+    def forward(self, x, return_route = False):
         weights, indices = self.router(x) # (B, E), (B, K)  
 
         x = torch.einsum("bd,edh->ebh", x, self.weights1) # (E, B, D)
@@ -394,7 +394,10 @@ class MoEBlcokEinSum(nn.Module):
 
         x = torch.einsum("bkd,bk->bd", topk_x, topk_weights)
 
-        return x 
+        if return_route:
+            return x, indices # return routing if needed
+        else:
+            return x 
     
 class MoEBlock(nn.Module):
     """

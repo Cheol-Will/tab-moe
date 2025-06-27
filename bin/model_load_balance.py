@@ -308,7 +308,6 @@ class ModelMoE(nn.Module):
         num_embeddings: None | dict = None,
         arch_type: str = "moe-mlp",
         k: None | int = None,
-        print_load: None | bool = None,
     ) -> None:
         assert n_num_features >= 0
         assert n_num_features or cat_cardinalities
@@ -452,18 +451,15 @@ def main(
 ) -> None | lib.JSONDict:
     # >>> Start
     config, output = lib.check(config, output, config_type=Config)
-    print("Debug", '-'*50)
+    print("Debug: Start of main", '-'*50)
     print(config)
     print(output)
-
-    return 
-    if not lib.start(output, force=force):
-        return None
 
     lib.print_config(config)  # type: ignore[code]
     delu.random.seed(config['seed'])
     device = lib.get_device()
     report = lib.create_report(main, config)
+ 
 
     # >>> Data
     dataset = lib.data.build_dataset(**config['data'])
@@ -538,10 +534,10 @@ def main(
     else:
         raise ValueError(f"arch_type is {config['model']['arch_type']}, which is not available.")
 
-    model.load_state_dict()
-    path = "exp/moe-sparse-shared-piecewiselinear/churn/0-evaluation/0/"
-    ckpt = lib.load_checkpoint(path)
-    model.load_state_dict(lib.load_checkpoint(path)['model'])
+    print("Debug", '-'*50)
+    print("Load state dict")
+    
+    model.load_state_dict(lib.load_checkpoint(output)['model'])
     
     
     report['n_parameters'] = lib.deep.get_n_parameters(model)
@@ -563,38 +559,8 @@ def main(
         2048 if config.get('compile', False) else 32768,
     )
     chunk_size = None  # Currently, not used.
-    share_training_batches = config['model'].get(
-        'share_training_batches', DEFAULT_SHARE_TRAINING_BATCHES
-    )
 
-    optimizer = lib.deep.make_optimizer(
-        **config['optimizer'], params=lib.deep.make_parameter_groups(model)
-    )
-    gradient_clipping_norm = config.get('gradient_clipping_norm')
-    _loss_fn = (
-        nn.functional.mse_loss
-        if dataset.task.is_regression
-        else nn.functional.cross_entropy
-    )
 
-    def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
-        return _loss_fn(
-            y_pred.flatten(0, 1),
-            (
-                y_true.repeat_interleave(y_pred.shape[1])
-                if share_training_batches
-                else y_true
-            ),
-        )
-
-    # The following generator is used only for creating training batches,
-    # so the random seed fully determines the sequence of training objects.
-    batch_generator = torch.Generator(device).manual_seed(config['seed'])
-    timer = delu.tools.Timer()
-    early_stopping = delu.tools.EarlyStopping(config['patience'], mode='max')
-    parameter_statistics = config.get('parameter_statistics', config['seed'] == 1)
-    training_log = []
-    writer = torch.utils.tensorboard.SummaryWriter(output)  # type: ignore[code]
 
     # Only bfloat16 was tested as amp_dtype.
     # However, float16 is supported as a fallback.
@@ -610,7 +576,6 @@ def main(
     )
     amp_enabled = amp_dtype is not None
     # For FP16, the gradient scaler must be used.
-    grad_scaler = torch.cuda.amp.GradScaler() if amp_dtype is torch.float16 else None  # type: ignore[code]
     logger.info(f'AMP enabled: {amp_enabled}')
 
     if config.get('compile', False):
@@ -658,8 +623,8 @@ def main(
                         pred, route = apply_model(part, idx)
                         temp_pred.append(pred) 
                         temp_route.append(route)
-                    result_pred = torch.cat(temp_pred)
-                    result_route = torch.cat(temp_route)
+                    result_pred = torch.cat(temp_pred).cpu().numpy()
+                    result_route = torch.cat(temp_route).cpu().numpy()
 
                     head_predictions[part] = result_pred
                     head_route[part] = result_route
@@ -693,32 +658,11 @@ def main(
             else {x: {'score': lib.WORST_SCORE} for x in predictions}
         )
         return metrics, predictions, head_predictions, eval_batch_size, head_route
-
-    def save_checkpoint() -> None:
-        lib.dump_checkpoint(
-            output,
-            {
-                'step': step,
-                'model': model.state_dict(),
-                'optimizer': optimizer.state_dict(),
-                'batch_generator': batch_generator.get_state(),
-                'random_state': delu.random.get_state(),
-                'early_stopping': early_stopping,
-                'report': report,
-                'timer': timer,
-                'training_log': training_log,
-            }
-            | (
-                {} if grad_scaler is None else {'grad_scaler': grad_scaler.state_dict()}
-            ),
-        )
-        lib.dump_report(output, report)
-        lib.backup_output(output)
-
     
     # >>>
     if lib.get_checkpoint_path(output).exists():
         model.load_state_dict(lib.load_checkpoint(output)['model'])
+
     report['metrics'], predictions, head_predictions, eval_batch_size, head_route = evaluate(
         ['train', 'val', 'test'], eval_batch_size
     )
@@ -727,11 +671,50 @@ def main(
     
     lib.dump_predictions(output, predictions)
     lib.dump_summary(output, lib.summarize(report))
-    lib.dum_route()
-    save_checkpoint(output, head_route)
+    
 
+    import json
+    from collections import Counter    # save routing result
+    import matplotlib.pyplot as plt
 
+    num_experts = config['model']['backbone']['num_experts']
+    
+    def save_route_counts(output: str | Path, head_route: dict[str, np.ndarray], num_experts: int) -> None:
+        counts_by_split = {}
+        
+        for split, routes in head_route.items():
+            flat = [expert for row in routes.tolist() for expert in row]
+            counter = Counter(flat)
+
+            full_counter = {i: counter.get(i, 0) for i in range(num_experts)}
+            counts_by_split[split] = full_counter
+
+        path = Path(output).joinpath("route_count.json")
+        path.write_text(json.dumps(counts_by_split, indent=4))
+        print(f"Expert count saved to {path}")
+
+        fig, axes = plt.subplots(1, 3, figsize=(18, 5), sharey=True)
+
+        for idx, (split, data) in enumerate(counts_by_split.items()):
+            experts = list(map(int, data.keys()))
+            counts = list(data.values())
+
+            axes[idx].bar(experts, counts)
+            axes[idx].set_title(f"{split}", fontsize = 24)
+            axes[idx].set_xlabel("Expert ID", fontsize = 24)
+            if idx == 0:
+                axes[idx].set_ylabel("Count", fontsize = 24)
+
+        fig.suptitle("Expert Usage Histogram per Split", fontsize=32)
+        fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+        fig_path = Path(output).joinpath("route_count_hist.png")
+        plt.savefig(fig_path)
+        plt.close()
+
+    save_route_counts(output, head_route, num_experts)
     lib.finish(output, report)
+
     return report
 
 

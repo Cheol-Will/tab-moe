@@ -47,7 +47,14 @@ def main(
         function_qualname = function
         evaluation_dir = path
         template_config = lib.load_config(evaluation_dir / '0')
-
+    
+    elif path.name.endswith('-balance'):
+        assert function is not None
+        from_tuning = False
+        function_qualname = function
+        evaluation_dir = path
+        template_config = lib.load_config(evaluation_dir / '0')
+    
     else:
         raise ValueError(f'Bad input path: {path}')
     del path
@@ -60,14 +67,7 @@ def main(
         config_path = output.with_suffix('.toml') 
         print(output)
         print(config_path)
-        return
         done = (output / 'DONE').exists()
-        if config_path.exists() and not done:
-            if output.exists():
-                logger.warning(f'Removing the incomplete output {output}')
-                shutil.rmtree(output)
-            if from_tuning or seed > 0:
-                config_path.unlink()
 
         config = deepcopy(template_config)
         config['seed'] = seed
@@ -81,7 +81,6 @@ def main(
             if (from_tuning or seed > 0) and not (config_path.exists() and done):
                 lib.dump_config(output, config)
             # function_(config, output, force=force) # bin.model.main: train-eval-test
-            print(output)
             function_(config, output, force=force) # call bin.model_load_balance.main()
 
 
