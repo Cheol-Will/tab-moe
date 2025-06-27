@@ -78,7 +78,7 @@ class NLinear(nn.Module):
         return x
 
 
-class PiecewiseLinearEmbeddings(rtdl_num_embeddings.PiecewiseLinearEmbeddings):
+class PiecewiseLinearEmbeddingsV2(rtdl_num_embeddings.PiecewiseLinearEmbeddings):
     """
     This class simply adds the default values for `activation` and `version`.
     """
@@ -90,7 +90,11 @@ class PiecewiseLinearEmbeddings(rtdl_num_embeddings.PiecewiseLinearEmbeddings):
         version: None | Literal['A', 'B'] = 'B',
         **kwargs,
     ) -> None:
-        super().__init__(*args, **kwargs, activation=activation, version=version)
+        # Future Work you ignored version since error says that
+        # PiecewiseLinearEmbeddings does not get kwarg version.
+         
+        # super().__init__(*args, **kwargs, activation=activation, version=version)
+        super().__init__(*args, **kwargs, activation=activation)
 
 
 class OneHotEncoding0d(nn.Module):
@@ -638,7 +642,7 @@ _CUSTOM_MODULES = {
         rtdl_num_embeddings.LinearEmbeddings,
         rtdl_num_embeddings.LinearReLUEmbeddings,
         rtdl_num_embeddings.PeriodicEmbeddings,
-        PiecewiseLinearEmbeddings,
+        PiecewiseLinearEmbeddingsV2,
         MLP,
         MoEMLP,
     ]

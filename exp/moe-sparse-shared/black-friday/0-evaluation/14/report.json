@@ -1,0 +1,63 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 14,
+        "batch_size": 512,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/black-friday",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00021027124944383898,
+            "weight_decay": 0.0013081473746629955
+        },
+        "model": {
+            "arch_type": "moe-sparse-shared",
+            "backbone": {
+                "k": 9,
+                "n_blocks": 3,
+                "d_block": 528,
+                "dropout": 0.029001504927742977,
+                "moe_ratio": 0.5,
+                "num_experts": 32
+            }
+        }
+    },
+    "n_parameters": 28503025,
+    "prediction_type": "labels",
+    "epoch_size": 209,
+    "best_step": 3762,
+    "metrics": {
+        "train": {
+            "rmse": 0.6657435065428022,
+            "mae": 0.5165671706199646,
+            "r2": 0.5560342036295454,
+            "score": -0.6657435065428022
+        },
+        "val": {
+            "rmse": 0.6952032582051381,
+            "mae": 0.5386312007904053,
+            "r2": 0.515316454287917,
+            "score": -0.6952032582051381
+        },
+        "test": {
+            "rmse": 0.6964959991392199,
+            "mae": 0.5405001044273376,
+            "r2": 0.5185562175249274,
+            "score": -0.6964959991392199
+        }
+    },
+    "time": "0:02:14.974250",
+    "chunk_size": null,
+    "eval_batch_size": 32768
+}
