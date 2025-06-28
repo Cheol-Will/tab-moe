@@ -1,0 +1,35 @@
+seed = 3
+batch_size = 1024
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/covtype2"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
+
+[optimizer]
+type = "AdamW"
+lr = 0.0013113404993972484
+weight_decay = 0.0011486171980175687
+
+[model]
+arch_type = "moe-sparse-shared"
+
+[model.backbone]
+k = 2
+n_blocks = 3
+d_block = 368
+dropout = 0.1501920237689005
+moe_ratio = 0.5
+num_experts = 20
+
+[model.num_embeddings]
+type = "PiecewiseLinearEmbeddingsV2"
+d_embedding = 24
+
+[bins]
+n_bins = 117

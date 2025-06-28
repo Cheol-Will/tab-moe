@@ -1,0 +1,34 @@
+seed = 12
+batch_size = 512
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/higgs-small"
+num_policy = "noisy-quantile"
+
+[optimizer]
+type = "AdamW"
+lr = 0.00018668344411615267
+weight_decay = 0.0021297117742477634
+
+[model]
+arch_type = "moe-sparse"
+
+[model.backbone]
+k = 8
+n_blocks = 1
+d_block = 176
+dropout = 0.31506940390592375
+moe_ratio = 0.25
+num_experts = 48
+
+[model.num_embeddings]
+type = "PiecewiseLinearEmbeddingsV2"
+d_embedding = 8
+
+[bins]
+n_bins = 125
