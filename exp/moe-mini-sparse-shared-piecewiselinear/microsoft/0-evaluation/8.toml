@@ -1,0 +1,34 @@
+seed = 8
+batch_size = 1024
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/microsoft"
+num_policy = "noisy-quantile"
+
+[optimizer]
+type = "AdamW"
+lr = 0.0014512660612581755
+weight_decay = 0.0989017129971717
+
+[model]
+arch_type = "moe-sparse-shared"
+
+[model.backbone]
+k = 4
+n_blocks = 1
+d_block = 64
+dropout = 0.13549954918479226
+moe_ratio = 0.25
+num_experts = 20
+
+[model.num_embeddings]
+type = "PiecewiseLinearEmbeddingsV2"
+d_embedding = 16
+
+[bins]
+n_bins = 10
