@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# src_type="tabm"
 src_type="moe-sparse-shared-piecewiselinear"
-dest_type="moe-mini-sparse-shared-piecewiselinear"
+dest_type="moe-sparse-piecewiselinear"
+# dest_type="moe-mini-sparse-piecewiselinear"
 # data_list=("adult" "black-friday")
 # data_list=("california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto" "tabred" "why")
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")

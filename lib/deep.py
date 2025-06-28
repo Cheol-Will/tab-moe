@@ -441,7 +441,7 @@ class MoEBlock(nn.Module):
         else:
             return out 
 
-class MoEMLP(nn.Module):
+class MoEShared(nn.Module):
     """
     MLP MOE
     """
@@ -459,7 +459,7 @@ class MoEMLP(nn.Module):
         k: int = 4,
     ) -> None:
         assert k > 0
-        super(MoEMLP, self).__init__()
+        super(MoEShared, self).__init__()
         d_in = d_block if d_in is None else d_in
 
         self.embed = nn.Linear(d_in, d_block)
@@ -515,7 +515,7 @@ class MoEMLP(nn.Module):
         else:
             return x
 
-class SparseSharedMoE(nn.Module):
+class MoESparseShared(nn.Module):
     """
     Sparse shared mixture of expert extends the SparseMoE 
     by including additional experts that are shared across all samples.
@@ -535,7 +535,7 @@ class SparseSharedMoE(nn.Module):
         k: int = 4,
     ) -> None:
         assert k > 0
-        super(SparseSharedMoE, self).__init__()
+        super(MoESparseShared, self).__init__()
 
         d_in = d_block if d_in is None else d_in
 
@@ -669,7 +669,8 @@ _CUSTOM_MODULES = {
         rtdl_num_embeddings.PeriodicEmbeddings,
         PiecewiseLinearEmbeddingsV2,
         MLP,
-        MoEMLP,
+        MoESparseShared, # you can remove 
+        MoEShared,
     ]
 }
 
