@@ -170,7 +170,7 @@ class Model(nn.Module):
         # >>> Backbone
         d_flat = d_num + d_cat
         self.minimal_ensemble_adapter = None
-        if arch_type == 'moe-mlp':
+        if arch_type == 'moe-sparse':
             self.backbone = None
         else: 
             self.backbone = lib.deep.make_module(d_in=d_flat, **backbone)
@@ -519,7 +519,7 @@ def main(
         bin_edges = None
 
     # branching for custom model
-    if config['model']['arch_type'] in ['moe-mlp', 'moe-sparse-shared']:
+    if config['model']['arch_type'] in ['moe-sparse', 'moe-sparse-shared']:
         print("Debug", "=" * 50)
         print(f"Init Model MoE with {config['model']['arch_type']}" )
         print(f"Init Model MoE with {config['model']}" )
