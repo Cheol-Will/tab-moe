@@ -701,11 +701,16 @@ def main(
 
             axes[idx].bar(experts, counts)
             axes[idx].set_title(f"{split}", fontsize = 24)
-            axes[idx].set_xlabel("Expert ID", fontsize = 24)
+            axes[idx].set_xlabel("Expert ID", fontsize = 15)
             if idx == 0:
                 axes[idx].set_ylabel("Count", fontsize = 24)
+        
 
-        fig.suptitle("Expert Usage Histogram per Split", fontsize=32)
+        # parts: [..., 'exp', 'moe-sparse-piecewiselinear', 'california', '0-load-balance', '0']
+        parts = Path(output).parts
+        model = parts[-4]  # 'moe-sparse-piecewiselinear'
+        data = parts[-3]   # 'california'
+        fig.suptitle(f"Routing Histogram of {model} on {data}", fontsize=32)
         fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
         fig_path = Path(output).joinpath("route_count_hist.png")
