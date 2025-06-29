@@ -502,7 +502,7 @@ class MoEShared(nn.Module):
         for i in range(self.n_blocks):
             if (i == 0) and return_route:
                 # return the routing result if needed in the first block.
-                x, route = self.moe[i](x) # (B, D)
+                x, route = self.moe[i](x, return_route) # (B, D)
             else:
                 # perform moe + shared expert for the rest of the blocks.
                 x = self.moe[i](x) # (B, D)

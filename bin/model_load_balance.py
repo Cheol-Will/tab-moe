@@ -306,7 +306,7 @@ class ModelMoE(nn.Module):
         backbone: dict,
         bins: None | list[Tensor],  # For piecewise-linear encoding/embeddings.
         num_embeddings: None | dict = None,
-        arch_type: str = "moe-mlp",
+        arch_type: str = "moe-sparse",
         k: None | int = None,
     ) -> None:
         assert n_num_features >= 0
@@ -351,7 +351,7 @@ class ModelMoE(nn.Module):
         self.minimal_ensemble_adapter = None
 
         print(f"Initiailize backbone as {arch_type}")
-        if arch_type == "moe-mlp":
+        if arch_type == "moe-sparse":
             self.backbone = lib.deep.MoEShared(d_in=d_flat, **backbone)
         elif arch_type == "moe-sparse-shared":
             self.backbone = lib.deep.MoESparseShared(d_in=d_flat, **backbone)
@@ -520,7 +520,7 @@ def main(
         bin_edges = None
 
     # branching for custom model
-    if config['model']['arch_type'] in ['moe-mlp', 'moe-sparse-shared']:
+    if config['model']['arch_type'] in ['moe-sparse', 'moe-sparse-shared']:
         print("Debug", "=" * 50)
         print(f"Init Model MoE with {config['model']['arch_type']}" )
         print(f"Init Model MoE with {config['model']}" )

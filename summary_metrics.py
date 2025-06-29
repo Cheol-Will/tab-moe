@@ -99,10 +99,14 @@ def main():
     model_list = [
         'tabm', 
         'tabm-piecewiselinear', 
+        'moe-sparse', 
+        'moe-sparse-piecewiselinear', 
         'moe-sparse-shared', 
         'moe-sparse-shared-piecewiselinear',
+        'moe-mini-sparse',
+        'moe-mini-sparse-piecewiselinear',
+        # 'moe-mini-sparse-shared',
         'moe-mini-sparse-shared-piecewiselinear',
-        'moe-sparse'
     ]
 
     for model in model_list:
