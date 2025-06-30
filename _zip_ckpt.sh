@@ -14,4 +14,4 @@ tar -czf "$OUTFILE" -T "$TMP_LIST"
 
 rm "$TMP_LIST"
 
-echo "✅ Done: $OUTFILE created with only 0-evaluation/0/checkpoint.pt files."
+echo "Done: $OUTFILE created with only 0-evaluation/0/checkpoint.pt files."

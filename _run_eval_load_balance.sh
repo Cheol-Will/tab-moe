@@ -3,14 +3,14 @@
 
 # model="moe-mini-sparse-shared-piecewiselinear"
 model_list=(
-    "moe-sparse" 
+    # "moe-sparse" 
     "moe-sparse-piecewiselinear" 
-    "moe-sparse-shared"
-    "moe-sparse-shared-piecewiselinear" 
-    "moe-mini-sparse" 
+    # "moe-sparse-shared"
+    # "moe-sparse-shared-piecewiselinear" 
+    # "moe-mini-sparse" 
     # "moe-mini-sparse-shared"
-    "moe-mini-sparse-piecewiselinear" 
-    "moe-mini-sparse-shared-piecewiselinear" 
+    # "moe-mini-sparse-piecewiselinear" 
+    # "moe-mini-sparse-shared-piecewiselinear" 
 )
 
 data_list=("adult" "black-friday" "california" "diamond" "higgs-small" "house" "otto" "covtype2" "microsoft" "churn")
