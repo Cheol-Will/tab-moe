@@ -15,7 +15,9 @@ amp = true
 
 [space.data]
 cache = true
-path = "data/otto"
+path = "data/diamond"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
 
 [space.optimizer]
 type = "AdamW"
@@ -34,14 +36,14 @@ weight_decay = [
 ]
 
 [space.model]
-arch_type = "moe-sparse"
+arch_type = "moe-sparse-shared"
 
 [space.model.backbone]
 k = [
     "_tune_",
     "int",
     1,
-    10,
+    4,
 ]
 n_blocks = [
     "_tune_",
@@ -73,7 +75,7 @@ moe_ratio = [
 num_experts = [
     "_tune_",
     "int",
-    16,
-    64,
-    16,
+    4,
+    32, 
+    4
 ]

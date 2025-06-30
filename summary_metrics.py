@@ -29,6 +29,9 @@ def print_metrics(model):
     print(df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std']))
     print()
 
+    df.to_csv(f"exp/{model}/metrics.csv")
+
+
 def print_hyperparameters(model):
 
     # Load all training runs.
@@ -69,6 +72,7 @@ def print_hyperparameters(model):
 
     # Some datasets have multiple splits, so they must be aggregated first.
     dfh = dfh.groupby('Dataset').mean()
+    dfh.loc['AVERAGE'] = dfh.mean(axis=0)
 
     # Finally, compute the statistics.
     # NOTE: it is important to take all statistics into account, especially the quantiles,
@@ -76,6 +80,9 @@ def print_hyperparameters(model):
     print(model)
     print(dfh)
     print()
+
+    dfh.to_csv(f"exp/{model}/hyperparameters.csv")
+
 
 def print_tuning_time(model):
     df = pd.json_normalize([
@@ -98,14 +105,14 @@ def print_tuning_time(model):
 def main():
     model_list = [
         'tabm', 
-        'tabm-piecewiselinear', 
         'moe-sparse', 
-        'moe-sparse-piecewiselinear', 
         'moe-sparse-shared', 
-        'moe-sparse-shared-piecewiselinear',
         'moe-mini-sparse',
-        'moe-mini-sparse-piecewiselinear',
         # 'moe-mini-sparse-shared',
+        'tabm-piecewiselinear', 
+        'moe-sparse-piecewiselinear', 
+        'moe-sparse-shared-piecewiselinear',
+        'moe-mini-sparse-piecewiselinear',
         'moe-mini-sparse-shared-piecewiselinear',
     ]
 
