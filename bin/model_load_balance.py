@@ -352,7 +352,7 @@ class ModelMoE(nn.Module):
 
         print(f"Initiailize backbone as {arch_type}")
         if arch_type == "moe-sparse":
-            self.backbone = lib.deep.MoEShared(d_in=d_flat, **backbone)
+            self.backbone = lib.deep.MoESparse(d_in=d_flat, **backbone)
         elif arch_type == "moe-sparse-shared":
             self.backbone = lib.deep.MoESparseShared(d_in=d_flat, **backbone)
 
