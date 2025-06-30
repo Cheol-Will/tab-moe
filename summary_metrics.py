@@ -205,8 +205,8 @@ def print_tuning_time(model):
 
 def main():
     model_list = [
-        'tabm', 
         'tabm-piecewiselinear', 
+        'tabm-mini-piecewiselinear', 
         'moe-sparse', 
         'moe-sparse-shared', 
         'moe-mini-sparse',
