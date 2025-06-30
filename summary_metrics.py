@@ -26,10 +26,11 @@ def print_metrics(model):
 
     # Aggregate the results over the random seeds.
     print(model, '-'*50)
-    print(df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std']))
+    df_agg = df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std'])
+    print(df_agg)
     print()
 
-    df.to_csv(f"exp/{model}/metrics.csv")
+    df_agg.to_csv(f"exp/{model}/metrics.csv")
 
 
 def print_hyperparameters(model):
