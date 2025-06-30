@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
 
 # arch_type="moe-sparse-shared"
-arch_type="moe-mini-sparse-piecewiselinear"
+# arch_type="moe-mini-sparse-piecewiselinear"
+arch_type="moe-sparse"
 
-data_list=("adult" "black-friday" "california" "diamond" "higgs-small" "house" "otto" "covtype2" "microsoft" "churn")
+data_list=("otto")
+# data_list=("adult" "black-friday" "california" "diamond" "higgs-small" "house" "otto" "covtype2" "microsoft" "churn")
 
 for data in "${data_list[@]}"
 do
