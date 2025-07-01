@@ -278,6 +278,64 @@ class LinearEfficientEnsemble(nn.Module):
         return x
 
 
+class MLP(nn.Module):
+    def __init__(
+        self,
+        *,
+        d_in: None | int = None,
+        d_out: None | int = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = 'ReLU',
+    ) -> None:
+        super().__init__()
+
+        d_first = d_block if d_in is None else d_in
+        self.blocks = nn.ModuleList(
+            [
+                nn.Sequential(
+                    nn.Linear(d_first if i == 0 else d_block, d_block),
+                    getattr(nn, activation)(),
+                    nn.Dropout(dropout),
+                )
+                for i in range(n_blocks)
+            ]
+        )
+        self.output = None if d_out is None else nn.Linear(d_block, d_out)
+
+    def forward(self, x: Tensor) -> Tensor:
+        for block in self.blocks:
+            x = block(x)
+        if self.output is not None:
+            x = self.output(x)
+        return x
+
+
+def make_efficient_ensemble(module: nn.Module, EnsembleLayer, **kwargs) -> None:
+    """Replace linear layers with efficient ensembles of linear layers.
+
+    NOTE
+    In the paper, there are no experiments with networks with normalization layers.
+    Perhaps, their trainable weights (the affine transformations) also need
+    "ensemblification" as in the paper about "FiLM-Ensemble".
+    Additional experiments are required to make conclusions.
+    """
+    for name, submodule in list(module.named_children()):
+        if isinstance(submodule, nn.Linear):
+            module.add_module(
+                name,
+                EnsembleLayer(
+                    in_features=submodule.in_features,
+                    out_features=submodule.out_features,
+                    bias=submodule.bias is not None,
+                    **kwargs,
+                ),
+            )
+        else:
+            make_efficient_ensemble(submodule, EnsembleLayer, **kwargs)
+
+
 class TopkRouter(nn.Module): 
     """
     Gating Network with logits
@@ -319,6 +377,7 @@ class TopkRouter(nn.Module):
 
         return full_weights, top_k_indices # return weights and indices
 
+
 class Expert(nn.Module):
     """
     Expert block with bottleneck.
@@ -353,6 +412,7 @@ class Expert(nn.Module):
     def forward(self, x):
         x = self.block(x)
         return x
+
 
 class MoEBlockEinSum(nn.Module):
 
@@ -554,62 +614,164 @@ class MoESparseShared(MoESparse):
         return (x, route) if return_route else x
 
 
-def make_efficient_ensemble(module: nn.Module, EnsembleLayer, **kwargs) -> None:
-    """Replace linear layers with efficient ensembles of linear layers.
-
-    NOTE
-    In the paper, there are no experiments with networks with normalization layers.
-    Perhaps, their trainable weights (the affine transformations) also need
-    "ensemblification" as in the paper about "FiLM-Ensemble".
-    Additional experiments are required to make conclusions.
+class MLP_Block(nn.Module):
     """
-    for name, submodule in list(module.named_children()):
-        if isinstance(submodule, nn.Linear):
-            module.add_module(
-                name,
-                EnsembleLayer(
-                    in_features=submodule.in_features,
-                    out_features=submodule.out_features,
-                    bias=submodule.bias is not None,
-                    **kwargs,
-                ),
-            )
-        else:
-            make_efficient_ensemble(submodule, EnsembleLayer, **kwargs)
+    ModernNCA style MLP block.
+    """
 
+    def __init__(
+        self, 
+        d_in: int, 
+        d_block: int, 
+        dropout: float, 
+        activation: str = "ReLU",
+    ):
+        super().__init__()
+        self.block = nn.Sequential(
+            nn.BatchNorm1d(d_in),
+            nn.Linear(d_in, d_block),
+            getattr(nn, activation)(),
+            nn.Dropout(dropout),
+            nn.Linear(d_block, d_in)
+        )
+        self.reset_parameters()
 
-class MLP(nn.Module):
+    def reset_parameters(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.in_features)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.in_features)
+            
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.block(x)
+    
+
+class TabRM(nn.Module):
+    """
+    Retrieve top-k neighbors and create k different views of query.
+    Generate k-multiple predictions. 
+    """
+    
     def __init__(
         self,
         *,
-        d_in: None | int = None,
-        d_out: None | int = None,
+        d_in: int | None = None,
+        d_out: int | None = None,
         n_blocks: int,
         d_block: int,
         dropout: float,
-        activation: str = 'ReLU',
+        activation: str = "ReLU",
+        num_experts: int = 32,
+        k: int = 4,
+        sample_rate: float = 0.8,
+        memory_efficient: bool = True,
     ) -> None:
-        super().__init__()
+        super(TabRM, self).__init__()
+        d_in = d_block if d_in is None else d_in
 
-        d_first = d_block if d_in is None else d_in
-        self.blocks = nn.ModuleList(
-            [
-                nn.Sequential(
-                    nn.Linear(d_first if i == 0 else d_block, d_block),
-                    getattr(nn, activation)(),
-                    nn.Dropout(dropout),
-                )
-                for i in range(n_blocks)
-            ]
+        # embedding process: 
+        # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> BatchNorm
+        self.embed = nn.Sequential(*[
+            nn.Linear(d_in, d_block),
+            MLP_Block(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
+            nn.BatchNorm1d(d_block),
+        ])
+
+        # [linear -> ReLU -> Dropout] x n_blocks
+        self.mlp = MLP(
+            d_in=d_block, 
+            n_blocks=n_blocks, 
+            d_block=d_block, 
+            dropout=dropout, 
+            activation=activation
         )
+
         self.output = None if d_out is None else nn.Linear(d_block, d_out)
 
-    def forward(self, x: Tensor) -> Tensor:
-        for block in self.blocks:
-            x = block(x)
+        self.d_in = d_in
+        self.d_block = d_block
+        self.n_blocks = n_blocks
+        self.num_experts = num_experts
+        self.k = k
+        self.sample_rate = sample_rate # for subset sampling during trainig
+        self.search_index = None
+        self.memory_efficient = memory_efficient
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        # init embedding layer
+        for module in self.embed:
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.in_features)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.in_features)
+
+        # init MLPs
+        for block in self.mlp.blocks:
+            for layer in block:
+                if isinstance(layer, nn.Linear):
+                    init_rsqrt_uniform_(layer.weight, layer.in_features)
+                    if layer.bias is not None:
+                        init_rsqrt_uniform_(layer.bias, layer.in_features)
+
+        # below lines are not likely to be used.
+        if self.mlp.output is not None:
+            init_rsqrt_uniform_(self.mlp.output.weight, self.d_block)
+            if self.mlp.output.bias is not None:
+                init_rsqrt_uniform_(self.mlp.output.bias, self.d_block)
+
         if self.output is not None:
-            x = self.output(x)
+            init_rsqrt_uniform_(self.output.weight, self.d_block)
+            if self.output.bias is not None:
+                init_rsqrt_uniform_(self.output.bias, self.d_block)
+
+    @torch.no_grad()
+    def retrieve(self, x, candidate_x):
+        # may not need this since ModernNCA does not use no_grad.
+        pass
+
+    def forward(self, x: Tensor, candidate_x) -> Tensor:
+        """
+            inputs: 
+            x: tensor (B, F)
+            candidate_x: training dataset (N, F)
+            During training, query itself is not included in candidate_x. 
+                        
+            output: tensor (B, K, F)
+            Note that output is k-multiple prediction;
+              thus, successive layer must be NLINEAR! 
+        """
+
+        if self.trainig:
+            # During training, use subset of train dataset for retrieval.  
+            # This is crucial for training efficiency. 
+            data_size=candidate_x.shape[0] # (B, F)
+            retrival_size=int(data_size*self.sample_rate)
+            sample_idx=torch.randperm(data_size)[:retrival_size]
+            candidate_x=candidate_x[sample_idx]
+
+        x = self.embed(x) # (B, F) -> (B, D)
+        candidate_x = self.embed(candidate_x) # (N, F) -> (B, D)
+        distances = torch.cdist(x, candidate_x, p=2) # (B, N) 
+
+        _, top_k_indices = torch.topk(-distances, k=self.k, dim=-1) # (B, K)
+ 
+
+        # 
+
+        # concat query x and keys -> (B, K, D), which is k different views of query.
+
+
+        # Keep in mind that self.output should be NLINEAR since this class outputs k-multiple predictions
+
+        if self.output is not None:
+            x = self.output(x) # (B, D) -> (B, d_out) if needed.
+
+        # return the first routing result if needed.
         return x
+
 
 
 _CUSTOM_MODULES = {

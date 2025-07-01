@@ -308,7 +308,7 @@ class ModelMoE(nn.Module):
         num_embeddings: None | dict = None,
         arch_type: str = "moe-sparse",
         k: None | int = None,
-        print_load: None | bool = None,
+        print_load: None | bool = None, # For analysis of load balance.
     ) -> None:
         assert n_num_features >= 0
         assert n_num_features or cat_cardinalities
@@ -497,6 +497,24 @@ def main(
         torch.long if dataset.task.is_classification else torch.float
     )
 
+
+    def get_Xy(part: str, idx) -> tuple[dict[str, Tensor], Tensor]:
+        batch = (
+            {
+                key[2:]: dataset.data[key][part]
+                for key in dataset.data
+                if key.startswith('x_') # modify to x_
+                # if key.startswith('X_')
+            },
+            dataset.Y[part],
+        )
+        return (
+            batch
+            if idx is None
+            else ({k: v[idx] for k, v in batch[0].items()}, batch[1][idx])
+        )
+
+
     # >>> Model
     if 'bins' in config:
         # Compute the bins for PiecewiseLinearEncoding and PiecewiseLinearEmbeddings.
@@ -570,6 +588,10 @@ def main(
         else nn.functional.cross_entropy
     )
 
+    # Keep the train_indices for Retrieval-based Model
+    train_size = dataset.size('train')
+    train_indices = torch.arange(train_size, device=device)
+
     def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
         return _loss_fn(
             y_pred.flatten(0, 1),
@@ -625,6 +647,27 @@ def main(
             .squeeze(-1)  # Remove the last dimension for regression predictions.
             .float()
         )
+
+    @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
+    def apply_model_tabr(part: PartKey, idx: Tensor) -> Tensor:
+        """
+        Call forward of retrieval-based model. 
+        Model takes x (query), candidate_x.
+        During training, exclude current mini-batch index.   
+        Note that you get y as well as x, but do not use y in TabRM.
+        """
+        is_train = part == 'train'
+        x, y = get_Xy(part, idx)
+        return model(
+            x,
+            *get_Xy(
+                'train',
+                train_indices[~torch.isin(train_indices, idx)] if is_train else None,
+            ),
+        ).squeeze(-1)
+
+
+
 
     @evaluation_mode()
     def evaluate(
