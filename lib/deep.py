@@ -369,9 +369,11 @@ class MoEBlockEinSum(nn.Module):
         self.router = TopkRouter(d_block, num_experts, k)
         
         self.weights1 = nn.Parameter(torch.empty(num_experts, d_block, int(d_block*moe_ratio)))
+        # self.bias1 = nn.Parameter(torch.empty(num_experts, int(d_block*moe_ratio)))
         self.act1 = getattr(nn, activation)()
         self.dropout1 = nn.Dropout(dropout)  
         self.weights2 = nn.Parameter(torch.empty(num_experts, int(d_block*moe_ratio), d_block))
+        # self.bias2 = nn.Parameter(torch.empty(num_experts, d_block))
         self.act2 = getattr(nn, activation)()
         self.dropout2 = nn.Dropout(dropout)  
 
@@ -381,15 +383,22 @@ class MoEBlockEinSum(nn.Module):
         init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
         init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
 
+        # init_rsqrt_uniform_(self.bias1, self.weights1.shape[-1])
+        # init_rsqrt_uniform_(self.bias2, self.weights2.shape[-1])
+
     def forward(self, x, return_route = False):
         weights, indices = self.router(x) # (B, E), (B, K)  
+        # batch_size, hidden_dim = x.shape
 
         x = torch.einsum("bd,edh->ebh", x, self.weights1) # (E, B, D)
+        # x = x + self.bias1.unsqueeze(1).expand(-1, batch_size, -1) # (E, B, D)
         x = self.dropout1(self.act1(x))
         x = torch.einsum("ebh,ehd->ebd", x, self.weights2) # (E, B, D)
+        # x = x + self.bias2.unsqueeze(1).expand(-1, batch_size, -1) # (E, B, D)
         x = self.dropout2(self.act2(x))
         x = x.transpose(0, 1) # (B, E, D)
 
+        # extract 
         topk_x = torch.gather(x, 1, indices.unsqueeze(-1).expand(-1, -1, x.size(-1))) # (B, K, D)
         topk_weights = torch.gather(weights, 1, indices)  # (B, K)
 
@@ -504,6 +513,7 @@ class MoESparseShared(MoESparse):
             k=k,
         )
 
+        # only add shared expert
         self.shared_expert = nn.ModuleList([
             nn.Sequential(
                 nn.Linear(d_block, d_block),
