@@ -286,7 +286,7 @@ class Model(nn.Module):
             pass
 
         x = self.backbone(x) # (B, K, F) -> (B, K, D) or (B, F) -> (B, D)
-        x = self.output(x) # (B, 1, D_OUT) or (B, D_OUT)
+        x = self.output(x) # (B, K, D_OUT) or (B, D_OUT)
         if (self.k is None) or self.arch_type in ['plain', 'moe-mlp']:
             # Adjust the output shape for plain or moe networks to make them compatible
             # with the rest of the script (loss, metrics, predictions, ...).
@@ -393,6 +393,127 @@ class ModelMoE(nn.Module):
             return x, route
         else:
             return x        
+        
+
+class ModelTabRM(nn.Module):
+    """ModelTabRM"""
+    def __init__(
+        self,
+        *,
+        n_num_features: int,
+        cat_cardinalities: list[int],
+        n_classes: None | int,
+        backbone: dict,
+        bins: None | list[Tensor],  # For piecewise-linear encoding/embeddings.
+        num_embeddings: None | dict = None,
+        arch_type: str = "tabrm",
+        k: None | int = None,
+        sample_rate: float = 0.8,
+    ) -> None:
+        assert k is not None
+        assert sample_rate > 0
+        assert n_num_features >= 0
+        assert n_num_features or cat_cardinalities
+        super().__init__()
+            # >>> Continuous (numerical) features
+        first_adapter_sections = []  # See the comment in `_init_first_adapter`.
+
+        if n_num_features == 0:
+            assert bins is None
+            self.num_module = None
+            d_num = 0
+
+        elif num_embeddings is None:
+            assert bins is None
+            self.num_module = None
+            d_num = n_num_features
+            first_adapter_sections.extend(1 for _ in range(n_num_features))
+
+        else:
+            if bins is None:
+                self.num_module = lib.deep.make_module(
+                    **num_embeddings, n_features=n_num_features
+                )
+            else:
+                assert num_embeddings['type'].startswith('PiecewiseLinearEmbeddings')
+                self.num_module = lib.deep.make_module(**num_embeddings, bins=bins)
+            d_num = n_num_features * num_embeddings['d_embedding']
+            first_adapter_sections.extend(
+                num_embeddings['d_embedding'] for _ in range(n_num_features)
+            )
+
+        # >>> Categorical features
+        self.cat_module = (
+            lib.deep.OneHotEncoding0d(cat_cardinalities) if cat_cardinalities else None
+        )
+        first_adapter_sections.extend(cat_cardinalities)
+        d_cat = sum(cat_cardinalities)
+
+        d_flat = d_num + d_cat
+        self.minimal_ensemble_adapter = None
+
+        print(f"Initiailize backbone as {arch_type}")
+        if arch_type == "tabrm":
+            self.backbone = lib.deep.TabRM(d_in=d_flat, k=k, **backbone)
+        else: 
+            raise ValueError(f"Unknown arch_type: {arch_type}")
+
+        # >>> Output
+        # Since TabRM forms K separate views by concatenating the query with each retrieved key vector
+        # hidden dimension is 2*d_block
+
+        d_block = backbone['d_block']
+        d_out = 1 if n_classes is None else n_classes
+        self.output = lib.deep.NLinear(k, 2*d_block, d_out)  # type: ignore[code]
+
+        # >>>
+        self.arch_type = arch_type
+        self.k = k
+        self.sample_rate = sample_rate # for subset sampling during trainig
+
+    def _encode(self, x_num=None, x_cat=None):
+        # preprocess
+        x = []
+        
+        if x_num is not None:
+            x.append(x_num if self.num_module is None else self.num_module(x_num))
+        if x_cat is None:
+            assert self.cat_module is None
+        else:
+            assert self.cat_module is not None
+            x.append(self.cat_module(x_cat).float())
+        x = torch.column_stack([x_.flatten(1, -1) for x_ in x]) # (B, F)
+
+        return x
+
+    def forward(
+        self, x_num: None | Tensor = None, x_cat: None | Tensor = None, 
+        candidate_x_num: None | Tensor = None, candidate_x_cat: None | Tensor = None,
+    ) -> Tensor:
+
+        # During training, sample a subset of the candidates
+        if self.training:
+            data_size = (
+                candidate_x_num.shape[0]
+                if candidate_x_num is not None
+                else candidate_x_cat.shape[0]
+            )
+            retrieval_size = int(data_size * self.sample_rate)
+            idx = torch.randperm(data_size, device=x_num.device)[:retrieval_size]
+            if candidate_x_num is not None:
+                candidate_x_num = candidate_x_num[idx]
+            if candidate_x_cat is not None:
+                candidate_x_cat = candidate_x_cat[idx]
+        
+        # encode query and candidates
+        x = self._encode(x_num, x_cat)
+        candidate_x = self._encode(candidate_x_num, candidate_x_cat)
+        x = self.backbone(x, candidate_x) # (B, F) -> (B, K, D) 
+        x = self.output(x) # (B, K, D) -> (B, K, D_OUT)
+
+        return x        
+
+
 
 class Config(TypedDict):
     seed: int
@@ -538,10 +659,21 @@ def main(
 
     # branching for custom model
     if config['model']['arch_type'] in ['moe-sparse', 'moe-sparse-shared']:
-        print("Debug", "=" * 50)
+        # print("Debug", "=" * 50)
         print(f"Init Model MoE with {config['model']['arch_type']}" )
         print(f"Init Model MoE with {config['model']}" )
         model = ModelMoE(
+            n_num_features=dataset.n_num_features,
+            cat_cardinalities=dataset.compute_cat_cardinalities(),
+            n_classes=dataset.task.try_compute_n_classes(),
+            **config['model'],
+            bins=bin_edges,            
+        )
+    elif config['model']['arch_type'] in ['tabrm']:
+        # print("Debug", "=" * 50)
+        print(f"Init ModelTabRM with {config['model']['arch_type']}" )
+        print(f"Init ModelTabRM with {config['model']}" )
+        model = ModelTabRM(
             n_num_features=dataset.n_num_features,
             cat_cardinalities=dataset.compute_cat_cardinalities(),
             n_classes=dataset.task.try_compute_n_classes(),
@@ -638,15 +770,44 @@ def main(
         evaluation_mode = torch.inference_mode
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
-    def apply_model(part: PartKey, idx: Tensor) -> Tensor:
-        return (
-            model(
-                dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
-                dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
+    def apply_model(part: PartKey, idx: Tensor, is_train: bool = True) -> Tensor:
+        """
+        is_train is needed to avoid TabRM excluding every train data during evlauating on trainset.  
+        
+        """
+        
+        if config['model']['arch_type'] not in ['tabrm']:
+            return (
+                model(
+                    dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
+                    dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
+                )
+                .squeeze(-1)  # Remove the last dimension for regression predictions.
+                .float()
             )
-            .squeeze(-1)  # Remove the last dimension for regression predictions.
-            .float()
-        )
+        elif config['model']['arch_type'] in ['tabrm']:
+            # is_train = (part == 'train')
+            x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
+            x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
+
+            if is_train:
+                mask = ~torch.isin(train_indices, idx)
+                candidate_idx = train_indices[mask]
+            else:
+                candidate_idx = train_indices
+
+            candidate_x_num = (
+                dataset.data['x_num']['train'][candidate_idx]
+                if (candidate_idx is not None and 'x_num' in dataset.data) else None
+            )
+            candidate_x_cat = (
+                dataset.data['x_cat']['train'][candidate_idx]
+                if (candidate_idx is not None and 'x_cat' in dataset.data) else None
+            )
+
+            return model(x_num, x_cat, candidate_x_num, candidate_x_cat).squeeze(-1).float()
+        else:
+            raise ValueError(f"Unknown arch_type {config['model']['arch_type']}.")
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
     def apply_model_tabr(part: PartKey, idx: Tensor) -> Tensor:
@@ -667,8 +828,6 @@ def main(
         ).squeeze(-1)
 
 
-
-
     @evaluation_mode()
     def evaluate(
         parts: list[PartKey], eval_batch_size: int
@@ -683,7 +842,7 @@ def main(
                     head_predictions[part] = (
                         torch.cat(
                             [
-                                apply_model(part, idx)
+                                apply_model(part, idx, is_train=False)
                                 for idx in torch.arange(
                                     dataset.size(part), device=device
                                 ).split(eval_batch_size)

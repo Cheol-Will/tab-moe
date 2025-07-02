@@ -646,6 +646,8 @@ class MLP_Block(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
     
+import faiss
+import faiss.contrib.torch_utils  # << this line makes faiss work with PyTorch
 
 class TabRM(nn.Module):
     """
@@ -662,9 +664,8 @@ class TabRM(nn.Module):
         d_block: int,
         dropout: float,
         activation: str = "ReLU",
-        num_experts: int = 32,
-        k: int = 4,
-        sample_rate: float = 0.8,
+        k: int = 32,
+        # sample_rate: float = 0.8,
         memory_efficient: bool = True,
     ) -> None:
         super(TabRM, self).__init__()
@@ -679,26 +680,28 @@ class TabRM(nn.Module):
         ])
 
         # [linear -> ReLU -> Dropout] x n_blocks
+        # Since TabRM forms K separate views by concatenating the query with each retrieved key vector
+        # hidden dimension is 2*d_block
         self.mlp = MLP(
-            d_in=d_block, 
+            d_in=2*d_block, 
             n_blocks=n_blocks, 
-            d_block=d_block, 
+            d_block=2*d_block, 
             dropout=dropout, 
             activation=activation
         )
 
-        self.output = None if d_out is None else nn.Linear(d_block, d_out)
+        self.output = None if d_out is None else nn.Linear(2*d_block, d_out)
 
         self.d_in = d_in
         self.d_block = d_block
         self.n_blocks = n_blocks
-        self.num_experts = num_experts
         self.k = k
-        self.sample_rate = sample_rate # for subset sampling during trainig
+        # self.sample_rate = sample_rate # for subset sampling during trainig
         self.search_index = None
         self.memory_efficient = memory_efficient
 
         self.reset_parameters()
+
 
     def reset_parameters(self) -> None:
         # init embedding layer
@@ -718,19 +721,64 @@ class TabRM(nn.Module):
 
         # below lines are not likely to be used.
         if self.mlp.output is not None:
-            init_rsqrt_uniform_(self.mlp.output.weight, self.d_block)
+            init_rsqrt_uniform_(self.mlp.output.weight, self.mlp.output.in_features)
             if self.mlp.output.bias is not None:
-                init_rsqrt_uniform_(self.mlp.output.bias, self.d_block)
+                init_rsqrt_uniform_(self.mlp.output.bias, self.mlp.output.in_features)
 
         if self.output is not None:
-            init_rsqrt_uniform_(self.output.weight, self.d_block)
+            init_rsqrt_uniform_(self.output.weight, self.output.in_features)
             if self.output.bias is not None:
-                init_rsqrt_uniform_(self.output.bias, self.d_block)
+                init_rsqrt_uniform_(self.output.bias, self.output.in_features)
 
-    @torch.no_grad()
+    # @torch.no_grad()
     def retrieve(self, x, candidate_x):
-        # may not need this since ModernNCA does not use no_grad.
-        pass
+
+
+        B, F = x.shape
+        N, _ = candidate_x.shape
+        
+        # print(f"[Debug]: retrieve batch-size B={B}, pool-size N={N}, k={self.k}")
+        # if N == 0:
+        #     print(self.training)
+
+        x = self.embed(x) # (B, F) -> (B, D)
+        with torch.set_grad_enabled(
+            torch.is_grad_enabled() and not self.memory_efficient
+        ):
+            candidate_xn = self.embed(candidate_x) 
+
+        batch_size, d_block = x.shape
+        device = x.device
+        with torch.no_grad():
+            candidate_xn_ = candidate_xn.to(torch.float32)
+            x_ = x.to(torch.float32)
+
+            if self.search_index is None:
+                self.search_index = (
+                    (
+                        faiss.GpuIndexFlatL2 # defulat L2 distance
+                    )(faiss.StandardGpuResources(), d_block)
+                    if x.device.type == 'cuda'
+                    else (faiss.IndexFlatL2)(d_block)
+                )
+            self.search_index.reset()
+            self.search_index.add(candidate_xn_)
+            context_idx: Tensor
+            _, context_idx = self.search_index.search(
+                x_, self.k
+            )
+        
+        if self.memory_efficient and torch.is_grad_enabled():
+            # the gradient of embedding of context are not being tracked.
+            # thus, calculate the embedding once again to track gradient.   
+            B, K = batch_size, self.k
+            context_x = candidate_x[context_idx.reshape(-1)] # (B*K)
+            context_x = self.embed(context_x).reshape(B, K, -1) 
+        else:
+            # the gradient of embedding of context are being tracked.   
+            context_x = candidate_xn[context_idx] # retrieve 
+
+        return x, context_x # (B, D), (B, K, D)
 
     def forward(self, x: Tensor, candidate_x) -> Tensor:
         """
@@ -739,37 +787,23 @@ class TabRM(nn.Module):
             candidate_x: training dataset (N, F)
             During training, query itself is not included in candidate_x. 
                         
-            output: tensor (B, K, F)
+            output: tensor (B, K, D)
             Note that output is k-multiple prediction;
               thus, successive layer must be NLINEAR! 
         """
 
-        if self.trainig:
-            # During training, use subset of train dataset for retrieval.  
-            # This is crucial for training efficiency. 
-            data_size=candidate_x.shape[0] # (B, F)
-            retrival_size=int(data_size*self.sample_rate)
-            sample_idx=torch.randperm(data_size)[:retrival_size]
-            candidate_x=candidate_x[sample_idx]
-
-        x = self.embed(x) # (B, F) -> (B, D)
-        candidate_x = self.embed(candidate_x) # (N, F) -> (B, D)
-        distances = torch.cdist(x, candidate_x, p=2) # (B, N) 
-
-        _, top_k_indices = torch.topk(-distances, k=self.k, dim=-1) # (B, K)
- 
-
-        # 
+        # return embeded query and keys 
+        x, context_x = self.retrieve(x, candidate_x) # (B, D), (B, K, D) 
+        
+        x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
+        x = torch.cat([x, context_x], dim=-1)  # (B, K, 2D)
+        x = self.mlp(x) # (B, K, 2D)
+        if self.output is not None:
+            x = self.output(x)   # (B, d_out)
 
         # concat query x and keys -> (B, K, D), which is k different views of query.
-
-
         # Keep in mind that self.output should be NLINEAR since this class outputs k-multiple predictions
 
-        if self.output is not None:
-            x = self.output(x) # (B, D) -> (B, d_out) if needed.
-
-        # return the first routing result if needed.
         return x
 
 
