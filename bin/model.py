@@ -457,6 +457,8 @@ class ModelTabRM(nn.Module):
             self.backbone = lib.deep.TabRM(d_in=d_flat, k=k, **backbone)
         elif arch_type == "tabrmv2":
             self.backbone = lib.deep.TabRMv2(d_in=d_flat, k=k, **backbone)
+        elif arch_type == "tabrmv2-mini":
+            self.backbone = lib.deep.TabRMv2Mini(d_in=d_flat, k=k, **backbone)
         else: 
             raise ValueError(f"Unknown arch_type: {arch_type}")
 
