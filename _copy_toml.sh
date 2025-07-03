@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-src_type="moe-sparse-piecewiselinear"
-dest_type="tabrm-piecewiselinear"
+src_type="tabrm-piecewiselinear"
+dest_type="tabrmv2-piecewiselinear"
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")
 
 for dataset in "${data_list[@]}"

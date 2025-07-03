@@ -702,7 +702,6 @@ class TabRM(nn.Module):
 
         self.reset_parameters()
 
-
     def reset_parameters(self) -> None:
         # init embedding layer
         for module in self.embed:
@@ -806,6 +805,46 @@ class TabRM(nn.Module):
 
         return x
 
+class TabRMv2(TabRM):
+    """
+    Retrieve top-k neighbors and create k different views of query.
+    Generate k-multiple predictions via batch-ensemble.
+    """    
+    def __init__(
+        self,
+        *,
+        d_in: int | None = None,
+        d_out: int | None = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = "ReLU",
+        k: int = 32,
+        # sample_rate: float = 0.8,
+        memory_efficient: bool = True,
+    ) -> None:
+        super().__init__(
+            d_in=d_in,
+            d_out=d_out,
+            n_blocks=n_blocks,
+            d_block=d_block,
+            dropout=dropout,
+            activation=activation,
+            k=k,
+            memory_efficient=memory_efficient,
+        )
+        self.mlp = nn.Sequential(*[
+            LinearEfficientEnsemble(
+                in_features=d_block,
+                out_features=d_block,
+                bias=True,
+                k=k,
+                ensemble_scaling_in=True,
+                ensemble_scaling_out=True,
+                ensemble_bias=True,
+                scaling_init='ones' # initialize scale parameters (adapter) with 1.
+            ) 
+        ])
 
 
 _CUSTOM_MODULES = {
