@@ -217,7 +217,6 @@ def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
     for i, row in paper.iterrows():
         ds = row["dataset"]
         asc = (row["direction"] == "lower_is_better")  # True if regression else False
-        # 해당 행의 모델 값만 Series로 뽑아 랭크
         ranks = row[model_cols].rank(ascending=asc, method="min")
         # filNaN 
         ranks = ranks.fillna(n_models)
@@ -247,7 +246,6 @@ def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
     for i, row in merged.iterrows():
         ds = row["dataset"]
         asc = (row["direction"] == "lower_is_better")  # True if regression else False
-        # 해당 행의 모델 값만 Series로 뽑아 랭크
         ranks = row[model_cols].rank(ascending=asc, method="min")
         # filNaN 
         ranks = ranks.fillna(n_models)
