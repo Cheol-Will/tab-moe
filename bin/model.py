@@ -673,7 +673,7 @@ def main(
             **config['model'],
             bins=bin_edges,            
         )
-    elif config['model']['arch_type'] in ['tabrm', 'tabrmv2']:
+    elif config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini']:
         # print("Debug", "=" * 50)
         print(f"Init with {config['model']['arch_type']}" )
         print(f"Init with {config['model']}" )
@@ -780,7 +780,7 @@ def main(
         
         """
         
-        if config['model']['arch_type'] not in ['tabrm', 'tabrmv2']:
+        if config['model']['arch_type'] not in ['tabrm', 'tabrmv2', 'tabrmv2-mini']:
             return (
                 model(
                     dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
@@ -789,7 +789,7 @@ def main(
                 .squeeze(-1)  # Remove the last dimension for regression predictions.
                 .float()
             )
-        elif config['model']['arch_type'] in ['tabrm', 'tabrmv2']:
+        elif config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini']:
             # is_train = (part == 'train')
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
