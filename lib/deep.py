@@ -851,6 +851,53 @@ class TabRMv2(TabRM):
         ])
 
 
+class TabRMv2Mini(TabRM):
+    """
+    Retrieve top-k neighbors and create k different views of query.
+    Apply adapter (scaling) to k queries and shared MLPs.
+    Note that it still uses k separate output layers.
+    """    
+    def __init__(
+        self,
+        *,
+        d_in: int | None = None,
+        d_out: int | None = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = "ReLU",
+        k: int = 32,
+        # sample_rate: float = 0.8,
+        memory_efficient: bool = True,
+    ) -> None:
+        super().__init__(
+            d_in=d_in,
+            d_out=d_out,
+            n_blocks=n_blocks,
+            d_block=d_block,
+            dropout=dropout,
+            activation=activation,
+            k=k,
+            memory_efficient=memory_efficient,
+        )
+
+        self.mlp = nn.Sequential(*[
+            ScaleEnsemble(
+                k,
+                2*d_block,
+                init='random-signs',
+            ),
+            MLP(
+            d_in=2*d_block, 
+            n_blocks=n_blocks, 
+            d_block=2*d_block, 
+            dropout=dropout, 
+            activation=activation
+            )
+        ])
+
+
+
 _CUSTOM_MODULES = {
     # https://docs.python.org/3/library/stdtypes.html#definition.__name__
     CustomModule.__name__: CustomModule

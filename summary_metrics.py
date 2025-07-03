@@ -148,6 +148,10 @@ def summary_hyperparameters(model_list, output_path="output/average_hyperparamet
                 'config.model.backbone.moe_ratio',
                 'config.model.backbone.num_experts',
             ]
+        elif 'tabrm' in model:
+            optional_params = [
+                'config.model.k',
+            ]            
         else:
             optional_params = ['config.model.k']
 
@@ -206,15 +210,15 @@ def print_tuning_time(model):
 def main():
     model_list = [
         'mlp-piecewiselinear',
-        'tabm-piecewiselinear',  # reported as best in TabM paper 
+        'tabm-piecewiselinear',  
         'tabm-mini-piecewiselinear',  # reported as best in TabM paper 
         # 'moe-sparse', 
         # 'moe-sparse-shared', 
         # 'moe-mini-sparse',
         # 'moe-mini-sparse-shared',
         'moe-sparse-piecewiselinear', 
-        'moe-sparse-shared-piecewiselinear',
-        'moe-mini-sparse-piecewiselinear',
+        # 'moe-sparse-shared-piecewiselinear',
+        # 'moe-mini-sparse-piecewiselinear',
         'moe-mini-sparse-shared-piecewiselinear',
         'tabrm-piecewiselinear', # Retrieval + Shared MLP
         'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
