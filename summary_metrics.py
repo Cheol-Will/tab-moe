@@ -205,16 +205,19 @@ def print_tuning_time(model):
 
 def main():
     model_list = [
-        'tabm-piecewiselinear', 
-        'tabm-mini-piecewiselinear', 
-        'moe-sparse', 
-        'moe-sparse-shared', 
-        'moe-mini-sparse',
-        'moe-mini-sparse-shared',
+        'mlp-piecewiselinear',
+        'tabm-piecewiselinear',  # reported as best in TabM paper 
+        'tabm-mini-piecewiselinear',  # reported as best in TabM paper 
+        # 'moe-sparse', 
+        # 'moe-sparse-shared', 
+        # 'moe-mini-sparse',
+        # 'moe-mini-sparse-shared',
         'moe-sparse-piecewiselinear', 
         'moe-sparse-shared-piecewiselinear',
         'moe-mini-sparse-piecewiselinear',
         'moe-mini-sparse-shared-piecewiselinear',
+        'tabrm-piecewiselinear', # Retrieval + Shared MLP
+        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
     ]
     data_list = [
         "adult", "black-friday", "california", "churn", "covtype2", "diamond", 

@@ -455,6 +455,8 @@ class ModelTabRM(nn.Module):
         print(f"Initiailize backbone as {arch_type}")
         if arch_type == "tabrm":
             self.backbone = lib.deep.TabRM(d_in=d_flat, k=k, **backbone)
+        elif arch_type == "tabrmv2":
+            self.backbone = lib.deep.TabRMv2(d_in=d_flat, k=k, **backbone)
         else: 
             raise ValueError(f"Unknown arch_type: {arch_type}")
 
@@ -669,10 +671,10 @@ def main(
             **config['model'],
             bins=bin_edges,            
         )
-    elif config['model']['arch_type'] in ['tabrm']:
+    elif config['model']['arch_type'] in ['tabrm', 'tabrmv2']:
         # print("Debug", "=" * 50)
-        print(f"Init ModelTabRM with {config['model']['arch_type']}" )
-        print(f"Init ModelTabRM with {config['model']}" )
+        print(f"Init with {config['model']['arch_type']}" )
+        print(f"Init with {config['model']}" )
         model = ModelTabRM(
             n_num_features=dataset.n_num_features,
             cat_cardinalities=dataset.compute_cat_cardinalities(),
@@ -776,7 +778,7 @@ def main(
         
         """
         
-        if config['model']['arch_type'] not in ['tabrm']:
+        if config['model']['arch_type'] not in ['tabrm', 'tabrmv2']:
             return (
                 model(
                     dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
@@ -785,7 +787,7 @@ def main(
                 .squeeze(-1)  # Remove the last dimension for regression predictions.
                 .float()
             )
-        elif config['model']['arch_type'] in ['tabrm']:
+        elif config['model']['arch_type'] in ['tabrm', 'tabrmv2']:
             # is_train = (part == 'train')
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None

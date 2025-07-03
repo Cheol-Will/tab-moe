@@ -731,7 +731,11 @@ class TabRM(nn.Module):
 
     # @torch.no_grad()
     def retrieve(self, x, candidate_x):
-
+        """
+        Retrieve from candidate_x.
+        During training, candidate_x is a subset of train dataset 
+            for computational efficieny and stochasticity. 
+        """
 
         B, F = x.shape
         N, _ = candidate_x.shape
@@ -747,10 +751,9 @@ class TabRM(nn.Module):
             candidate_xn = self.embed(candidate_x) 
 
         batch_size, d_block = x.shape
-        device = x.device
         with torch.no_grad():
             candidate_xn_ = candidate_xn.to(torch.float32)
-            x_ = x.to(torch.float32)
+            x_ = x.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
 
             if self.search_index is None:
                 self.search_index = (
@@ -788,7 +791,7 @@ class TabRM(nn.Module):
                         
             output: tensor (B, K, D)
             Note that output is k-multiple prediction;
-              thus, successive layer must be NLINEAR! 
+              thus, successive may use NLINEAR.
         """
 
         # return embeded query and keys 
@@ -835,15 +838,16 @@ class TabRMv2(TabRM):
         )
         self.mlp = nn.Sequential(*[
             LinearEfficientEnsemble(
-                in_features=d_block,
-                out_features=d_block,
+                in_features=2*d_block,
+                out_features=2*d_block,
                 bias=True,
                 k=k,
                 ensemble_scaling_in=True,
                 ensemble_scaling_out=True,
                 ensemble_bias=True,
                 scaling_init='ones' # initialize scale parameters (adapter) with 1.
-            ) 
+            )
+            for _ in range(n_blocks)
         ])
 
 
