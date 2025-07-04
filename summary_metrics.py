@@ -335,6 +335,19 @@ def main():
     summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=True)
     summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=False, is_save=False)
     # 
+
+    model_list = [
+         'moe-sparse-piecewiselinear', 
+        # 'moe-sparse-shared-piecewiselinear',
+        # 'moe-mini-sparse-piecewiselinear',
+        'moe-mini-sparse-shared-piecewiselinear',
+        'tabrm-piecewiselinear', # Retrieval + Shared MLP
+        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+        # 'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
+    ]
+    for model in model_list:
+        save_rank_csv(model, data_list)
+
     data_list = [
         "adult", 
         "black-friday", 
@@ -348,19 +361,7 @@ def main():
         # "otto",  
     ] 
 
-    model_list = [
-         'moe-sparse-piecewiselinear', 
-        # 'moe-sparse-shared-piecewiselinear',
-        # 'moe-mini-sparse-piecewiselinear',
-        'moe-mini-sparse-shared-piecewiselinear',
-        'tabrm-piecewiselinear', # Retrieval + Shared MLP
-        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-        # 'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
-    ]
-
-    save_ranks_csv(model_list, data_list)
-    # for model in model_list:
-    #     save_rank_csv(model, data_list)
+    # save_ranks_csv(model_list, data_list)
 
 if __name__ == "__main__":
     main()
