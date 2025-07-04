@@ -216,27 +216,55 @@ def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
     paper = pd.read_csv("output/paper_metrics.csv")
     df = summary_metrics_table([model], data_list, is_print=False, is_save=False)
     model_cols = [c for c in paper.columns if c not in ("dataset", "direction")]
-
-    # print("[Debug]")
-    # rank_df = pd.DataFrame(index=paper["dataset"], columns=model_cols, dtype=float)
-    # n_models = len(model_cols)
-    # for i, row in paper.iterrows():
-    #     ds = row["dataset"]
-    #     asc = (row["direction"] == "lower_is_better")  # True if regression else False
-    #     ranks = row[model_cols].rank(ascending=asc, method="min")
-    #     # filNaN 
-    #     ranks = ranks.fillna(n_models)
-    #     rank_df.loc[ds] = ranks
-    # avg_rank = rank_df.mean(axis=0)
-    # print("\nRank in paper_metrics")
-    # print(avg_rank.sort_values())
-    # print()
-
     summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
     merged = paper.merge(summary_t, on="dataset", how="left")
     merged = merged[merged["dataset"].isin(data_list)]
     merged.drop(columns=["TabPFN"], axis=1, inplace=True)
+    # merged.dropna(axis=0, inplace=True)
 
+    # preprocessing
+    merged.loc[merged["dataset"] == "house", model] /= 10000
+    model_cols = [c for c in merged.columns if c not in ("dataset", "direction")]
+    merged[model_cols] = merged[model_cols].abs()
+
+    rank_df = pd.DataFrame(index=merged["dataset"], columns=model_cols, dtype=float)
+
+    n_models = len(model_cols)
+    for i, row in merged.iterrows():
+        ds = row["dataset"]
+        asc = (row["direction"] == "lower_is_better")  # True if regression else False
+        ranks = row[model_cols].rank(ascending=asc, method="min")
+        # filNaN 
+        ranks = ranks.fillna(n_models)
+        rank_df.loc[ds] = ranks
+
+    avg_rank = rank_df.mean(axis=0)
+    avg_rank = avg_rank.sort_values()
+    out_file = f"output/metrics_merged_{model}.csv"
+    merged.to_csv(out_file, index=False, float_format="%.4f")
+    avg_rank.to_csv(f"output/avg_rank_{model}.csv")
+    print(f"\n▶ Saved merged metrics to `{out_file}`")
+    print(merged)
+    print(rank_df)
+    print(avg_rank)
+    return merged
+
+
+def save_ranks_csv(model: list[str], data_list: list[str], file_name: str = None) -> pd.DataFrame:
+    """
+    Add our model's metrics to paper metrics table and calculate rank statistics.
+    """
+
+    paper = pd.read_csv("output/paper_metrics.csv")
+    df = summary_metrics_table(model, data_list, is_print=False, is_save=False)
+    
+    model_cols = [c for c in paper.columns if c not in ("dataset", "direction")]
+    summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
+    
+    merged = paper.merge(summary_t, on="dataset", how="left")
+    merged = merged[merged["dataset"].isin(data_list)]
+    merged.drop(columns=["TabPFN"], axis=1, inplace=True)
+    # merged.dropna(axis=0, inplace=True)
 
     # preprocessing
     merged.loc[merged["dataset"] == "house", model] /= 10000
@@ -255,13 +283,20 @@ def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
         ranks = ranks.fillna(n_models)
         rank_df.loc[ds] = ranks
 
-    print(rank_df)
+    if file_name is None:
+        from datetime import datetime
+        file_name = datetime.now()
+    
     avg_rank = rank_df.mean(axis=0)
-    print(avg_rank.sort_values())
-    out_file = f"output/rank_{model}.csv"
+    avg_rank = avg_rank.sort_values()
+    out_file = f"output/metrics_merged_{file_name}.csv"
     merged.to_csv(out_file, index=False, float_format="%.4f")
-    print(f"\n▶ Saved merged ranking to `{out_file}`")
+    avg_rank.to_csv(f"output/avg_rank_{file_name}.csv")
+    print(f"\n▶ Saved merged metrics to `{file_name}`")
+
     print(merged)
+    print(rank_df)
+    print(avg_rank)
     return merged
 
 
@@ -281,6 +316,7 @@ def main():
         'moe-mini-sparse-shared-piecewiselinear',
         'tabrm-piecewiselinear', # Retrieval + Shared MLP
         'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+        # 'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
     ]
     data_list = [
         "adult", 
@@ -294,27 +330,37 @@ def main():
         "microsoft", 
         "otto",  
     ] 
-    model_list = [
-        'tabrm-piecewiselinear'
-    ]
+
     # Report-view of performance table
-    summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=False)
+    summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=True)
     summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=False, is_save=False)
-    
-    
+    # 
     data_list = [
         "adult", 
         "black-friday", 
         "california", 
         "churn", 
-        "covtype2", 
+        # "covtype2", 
         "diamond", 
         "higgs-small", 
-        "house", 
-        "microsoft", 
-        "otto",  
+        # "house", 
+        # "microsoft", 
+        # "otto",  
     ] 
-    save_rank_csv('tabrm-piecewiselinear', data_list)
+
+    model_list = [
+         'moe-sparse-piecewiselinear', 
+        # 'moe-sparse-shared-piecewiselinear',
+        # 'moe-mini-sparse-piecewiselinear',
+        'moe-mini-sparse-shared-piecewiselinear',
+        'tabrm-piecewiselinear', # Retrieval + Shared MLP
+        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+        # 'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
+    ]
+
+    save_ranks_csv(model_list, data_list)
+    # for model in model_list:
+    #     save_rank_csv(model, data_list)
 
 if __name__ == "__main__":
     main()
