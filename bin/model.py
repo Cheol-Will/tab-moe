@@ -431,6 +431,7 @@ class ModelTabRM(nn.Module):
 
         else:
             if bins is None:
+                print(f"Making num_module with {num_embeddings}")
                 self.num_module = lib.deep.make_module(
                     **num_embeddings, n_features=n_num_features
                 )
@@ -451,6 +452,21 @@ class ModelTabRM(nn.Module):
 
         d_flat = d_num + d_cat
         self.minimal_ensemble_adapter = None
+
+
+        # first_adapter_init = (
+        #         None
+        #         if arch_type == 'tabm-packed'
+        #         else 'normal'
+        #         if arch_type in ('tabm-mini-normal', 'tabm-normal')
+        #         # For other arch_types, the initialization depends
+        #         # on the presense of num_embeddings.
+        #         else 'random-signs'
+        #         if num_embeddings is None
+        #         else 'normal'
+        #     )
+
+
 
         print(f"Initiailize backbone as {arch_type}")
         if arch_type == "tabrm":
