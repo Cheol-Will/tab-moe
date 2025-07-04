@@ -288,7 +288,7 @@ def save_ranks_csv(model: list[str], data_list: list[str], file_name: str = None
         file_name = datetime.now()
     
     avg_rank = rank_df.mean(axis=0)
-    avg_rank = avg_rank.sort_values()
+    avg_rank = avg_rank.sort_values().round(3)
     out_file = f"output/metrics_merged_{file_name}.csv"
     merged.to_csv(out_file, index=False, float_format="%.4f")
     avg_rank.to_csv(f"output/avg_rank_{file_name}.csv")
