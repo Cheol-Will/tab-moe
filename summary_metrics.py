@@ -197,20 +197,19 @@ def print_tuning_time(model):
         for x in Path('exp').glob(f'{model}/**/0-tuning/report.json')
     ])
     df['Dataset'] = df['best.config.data.path'].map(get_dataset_name)
-    df.index = df['Dataset']
-    df = df.sort_index()
     idx = [
         "adult", "black-friday", "california", "churn", "covtype2", "diamond", 
         "higgs-small", "house", "microsoft", "otto",  
     ]
+    df["time"] = pd.to_timedelta(df["time"])
+
     print(model, '-'*50)
-    print(df.loc[idx, "time"])
-    print()
-    df = df.loc[idx, "time"]
-    df.to_csv(f"seraching_time_{model}.csv")
+    a = df.groupby("Dataset")["time"].sum().sort_values()
+    print(a, "\n")
+    print("Total:", a.sum())
+    a.to_csv(f"searching_time_{model}.csv", header=["total_time"])
 
-
-def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
+def merge_and_calulcate_rank(model: str, data_list: list[str], is_save: bool = False) -> pd.DataFrame:
     """
     Add our model's metrics to paper metrics table and calculate rank statistics.
     """
@@ -243,9 +242,10 @@ def save_rank_csv(model: str, data_list: list[str]) -> pd.DataFrame:
     avg_rank = rank_df.mean(axis=0)
     avg_rank = avg_rank.sort_values()
     out_file = f"output/metrics_merged_{model}.csv"
-    merged.to_csv(out_file, index=False, float_format="%.4f")
-    avg_rank.to_csv(f"output/avg_rank_{model}.csv")
-    print(f"\n▶ Saved merged metrics to `{out_file}`")
+    if is_save:
+        print(f"\n▶ Saved merged metrics to `{out_file}`")
+        merged.to_csv(out_file, index=False, float_format="%.4f")
+        avg_rank.to_csv(f"output/avg_rank_{model}.csv")
     print(merged)
     print(rank_df)
     print(avg_rank)
@@ -322,7 +322,9 @@ def main():
         'moe-mini-sparse-shared-piecewiselinear',
         'tabrm-piecewiselinear', # Retrieval + Shared MLP
         'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-        # 'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
+        'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        'tabrmv2-mini-piecewiselinear' # Retrieval + TabM-mini (Packed Batch ensemble)
     ]
     data_list = [
         "adult", 
@@ -355,6 +357,19 @@ def main():
     #     save_rank_csv(model, data_list)
 
     data_list = [
+        # "adult", 
+        # "black-friday", 
+        # "california", 
+        "churn", 
+        # "covtype2", 
+        # "diamond", 
+        # "higgs-small", 
+        "house", 
+        # "microsoft", 
+        # "otto",  
+    ] 
+    merge_and_calulcate_rank('tabrmv2-mini-periodic', data_list, False)
+    data_list = [
         "adult", 
         "black-friday", 
         "california", 
@@ -362,13 +377,13 @@ def main():
         # "covtype2", 
         "diamond", 
         "higgs-small", 
-        # "house", 
+        "house", 
         # "microsoft", 
         # "otto",  
     ] 
+    merge_and_calulcate_rank('tabrmv2-periodic', data_list, False)
     # save_ranks_csv(model=None, data_list=None, file_name="paper_avg_rank")
 
     # save_ranks_csv(model_list, data_list)
-
 if __name__ == "__main__":
     main()
