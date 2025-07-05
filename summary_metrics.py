@@ -171,7 +171,9 @@ def summary_hyperparameters(model_list, output_path="output/average_hyperparamet
 
         dfh = dfh.groupby('Dataset').mean()
         if is_print:
+            print(model)
             print(dfh)
+            print()
         
         average_row = dfh.mean(axis=0)
         average_row.name = model  # Use model name as row index
@@ -337,7 +339,7 @@ def main():
 
     # Report-view of performance table
     summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=False)
-    summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=False, is_save=False)
+    summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=print, is_save=False)
     # 
 
     model_list = [
@@ -364,7 +366,7 @@ def main():
         # "microsoft", 
         # "otto",  
     ] 
-    save_ranks_csv(model=None, data_list=None, file_name="paper_avg_rank")
+    # save_ranks_csv(model=None, data_list=None, file_name="paper_avg_rank")
 
     # save_ranks_csv(model_list, data_list)
 
