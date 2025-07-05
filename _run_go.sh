@@ -1,11 +1,14 @@
 #!/usr/bin/env bash
 # arch_type="moe-mini-sparse-shared"
 # arch_type="tabrm-piecewiselinear"
+# arch_type="tabrmv2-mini-periodic"
 arch_type="tabrmv2-mini-periodic"
+
+
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")
 data_list=(
-  "tabred/sberbank-housing"
   "churn"
+  "tabred/sberbank-housing"
   "why/regression-cat-medium-0-OnlineNewsPopularity/"
   "tabred/ecom-offers"
   "why/classif-num-medium-0-credit"

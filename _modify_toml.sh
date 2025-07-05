@@ -2,12 +2,15 @@
 set -euo pipefail
 
 # Check the destination root!!
-DEST_ROOT="exp/mlp-debug2"
+# DEST_ROOT="exp/mlp-debug2"
+DEST_ROOT="exp/tabrmv2-mini-periodic"
+
 
 # 1) Define replacement block
 BLOCK=$(cat << 'EOF'
+
 [space.model]
-arch_type = "tabrm"
+arch_type = "tabrmv2-mini"
 sample_rate = [
     "_tune_",
     "uniform",
@@ -27,7 +30,7 @@ n_blocks = [
     "_tune_",
     "int",
     1,
-    4,
+    5,
 ]
 d_block = [
     "_tune_",
@@ -45,22 +48,29 @@ dropout = [
 ]
 
 [space.model.num_embeddings]
-type = "PiecewiseLinearEmbeddingsV2"
+type = "PeriodicEmbeddings"
+n_frequencies = [
+    "_tune_",
+    "int",
+    16,
+    96,
+    4,
+]
 d_embedding = [
     "_tune_",
     "int",
-    8,
+    16,
     32,
     4,
 ]
-
-[space.bins]
-n_bins = [
+frequency_init_scale = [
     "_tune_",
-    "int",
-    2,
-    128,
+    "loguniform",
+    0.01,
+    10.0,
 ]
+lite = false
+
 EOF
 )
 
