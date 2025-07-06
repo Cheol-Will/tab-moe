@@ -950,7 +950,7 @@ class TabRMv3(nn.Module):
         n_classes: int = None,
         ensemble_type: str = "batch",
     ) -> None:
-        super(TabRM, self).__init__()
+        super(TabRMv3, self).__init__()
         d_in = d_block if d_in is None else d_in
 
         # >>> E
