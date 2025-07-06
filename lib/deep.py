@@ -897,6 +897,229 @@ class TabRMv2Mini(TabRM):
         ])
 
 
+class TabRMv3(nn.Module):
+    """
+    Retrieve top-k neighbors and create different views of query with label context.
+    Generate multiple predictions. 
+    """
+    
+    def __init__(
+        self,
+        *,
+        d_in: int | None = None,
+        d_out: int | None = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = "ReLU",
+        k: int = 32,
+        # sample_rate: float = 0.8,
+        memory_efficient: bool = True,
+    ) -> None:
+        super(TabRM, self).__init__()
+        d_in = d_block if d_in is None else d_in
+
+        # embedding process: 
+        # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> BatchNorm
+        self.embed = nn.Sequential(*[
+            nn.Linear(d_in, d_block),
+            MLP_Block(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
+            nn.BatchNorm1d(d_block),
+        ])
+
+        # 
+        self.label_encoder = None
+        self.T = None
+
+        # [linear -> ReLU -> Dropout] x n_blocks
+        # Since TabRM forms K separate views by concatenating the query with each retrieved key vector
+        # hidden dimension is 2*d_block
+        self.mlp = MLP(
+            d_in=2*d_block, 
+            n_blocks=n_blocks, 
+            d_block=2*d_block, 
+            dropout=dropout, 
+            activation=activation
+        )
+
+        self.output = None if d_out is None else nn.Linear(2*d_block, d_out)
+
+        self.d_in = d_in
+        self.d_block = d_block
+        self.n_blocks = n_blocks
+        self.k = k
+        self.search_index = None
+        self.memory_efficient = memory_efficient
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        # init embedding layer
+        for module in self.embed:
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.in_features)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.in_features)
+
+        # init MLPs
+        for block in self.mlp.blocks:
+            for layer in block:
+                if isinstance(layer, nn.Linear):
+                    init_rsqrt_uniform_(layer.weight, layer.in_features)
+                    if layer.bias is not None:
+                        init_rsqrt_uniform_(layer.bias, layer.in_features)
+
+        # below lines are not likely to be used.
+        if self.mlp.output is not None:
+            init_rsqrt_uniform_(self.mlp.output.weight, self.mlp.output.in_features)
+            if self.mlp.output.bias is not None:
+                init_rsqrt_uniform_(self.mlp.output.bias, self.mlp.output.in_features)
+
+        if self.output is not None:
+            init_rsqrt_uniform_(self.output.weight, self.output.in_features)
+            if self.output.bias is not None:
+                init_rsqrt_uniform_(self.output.bias, self.output.in_features)
+
+    # @torch.no_grad()
+    def retrieve(self, x, candidate_x, y, candidate_y):
+        """
+        Retrieve from candidates.
+        During training, candidate_x is a subset of train dataset 
+            for computational efficieny and stochasticity. 
+        """
+
+        B, F = x.shape
+        N, _ = candidate_x.shape
+        
+        # print(f"[Debug]: retrieve batch-size B={B}, pool-size N={N}, k={self.k}")
+        # if N == 0:
+        #     print(self.training)
+
+        x = self.embed(x) # (B, F) -> (B, D)
+        with torch.set_grad_enabled(
+            torch.is_grad_enabled() and not self.memory_efficient
+        ):
+            candidate_xn = self.embed(candidate_x) 
+
+        if self.training:
+            assert y is not None
+            candidate_x = torch.cat([x, candidate_x])
+            candidate_y = torch.cat([y, candidate_y])
+        else:
+            assert y is None
+
+        batch_size, d_block = x.shape
+        device = x.device
+        with torch.no_grad():
+            candidate_xn_ = candidate_xn.to(torch.float32)
+            x_ = x.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
+
+            if self.search_index is None:
+                self.search_index = (
+                    (
+                        faiss.GpuIndexFlatL2 # defulat L2 distance
+                    )(faiss.StandardGpuResources(), d_block)
+                    if x.device.type == 'cuda'
+                    else (faiss.IndexFlatL2)(d_block)
+                )
+            self.search_index.reset()
+            self.search_index.add(candidate_xn_)
+            distances: Tensor
+            context_idx: Tensor
+            distances, context_idx = self.search_index.search(
+                x_, self.k + (1 if self.training else 0)
+            )
+
+            if self.training:
+                distances[
+                    context_idx == torch.arange(batch_size, device=device)[:, None]
+                ] = torch.inf
+                # Not the most elegant solution to remove the argmax, but anyway.
+                context_idx = context_idx.gather(-1, distances.argsort()[:, :-1])
+
+        if self.memory_efficient and torch.is_grad_enabled():
+            # the gradient of embedding of context are not being tracked.
+            # thus, calculate the embedding once again to track gradient.   
+            B, K = batch_size, self.k
+            context_x = candidate_x[context_idx.reshape(-1)] # (B*K)
+            context_x = self.embed(context_x).reshape(B, K, -1) # (B, K, D)
+        else:
+            # the gradient of embedding of context are being tracked.   
+            context_x = candidate_xn[context_idx] # retrieve 
+
+
+        # Recompute similarites
+        similarities = (
+            -x.square().sum(-1, keepdim=True)
+            + (2 * (x[..., None, :] @ context_x.transpose(-1, -2))).squeeze(-2)
+            - context_x.square().sum(-1)
+        )
+
+        #
+        #          
+        #          
+        # reshape similarities so that we can get k groups.
+        # Let's just sample indicies from context_idx
+        # for example, make it 4 groups of indicies.
+        # and calclate probs for each group
+        # create context_x for each group
+        # return them. and use context + x (B, K, D)
+        # so that 
+        probs = F.softmax(similarities, dim=-1)
+
+
+        context_y_emb = self.label_encoder(candidate_y[context_idx][..., None])
+        values = context_y_emb + self.T(x[:, None] - context_x)
+        
+        # how to shape context x?
+        # what if I want to make it (B, K, D)
+        # so that we can have diverse view of x.
+        context_x = (probs[:, None] @ values).squeeze(1)
+
+        return x, context_x # (B, D), (B, K, D)
+
+
+
+    def forward(
+            self, x: Tensor, candidate_x: Tensor,
+            y: Tensor, candidate_y: Tensor, 
+    ) -> Tensor:
+        """
+            inputs: 
+            x: tensor (B, F)
+            candidate_x: training dataset (N, F)
+            y: tensor (B, F)
+            candidate_y: training dataset (N, F)
+            During training, query itself is not included in candidate_x, but will be added in retrieve
+                        
+            output: tensor (B, K, D)
+            Note that output is k-multiple prediction;
+              thus, successive may use NLINEAR.
+        """
+
+        # return embeded query and keys 
+        x, context_x = self.retrieve(x, candidate_x, y, candidate_y) # (B, D), (B, K, D) 
+        
+
+ 
+        # Now how to use context? 
+
+        # split or ......
+
+
+        x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
+        x = torch.cat([x, context_x], dim=-1)  # (B, K, 2D)
+        x = self.mlp(x) # (B, K, 2D)
+        if self.output is not None:
+            x = self.output(x)   # (B, d_out)
+
+        # concat query x and keys -> (B, K, D), which is k different views of query.
+        # Keep in mind that self.output should be NLINEAR since this class outputs k-multiple predictions
+
+        return x
+
+
+
 
 _CUSTOM_MODULES = {
     # https://docs.python.org/3/library/stdtypes.html#definition.__name__

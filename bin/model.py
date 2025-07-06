@@ -509,6 +509,7 @@ class ModelTabRM(nn.Module):
     def forward(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None, 
         candidate_x_num: None | Tensor = None, candidate_x_cat: None | Tensor = None,
+        y: None | Tensor = None, candidate_y: None | Tensor = None,
     ) -> Tensor:
 
         # During training, sample a subset of the candidates
@@ -524,11 +525,19 @@ class ModelTabRM(nn.Module):
                 candidate_x_num = candidate_x_num[idx]
             if candidate_x_cat is not None:
                 candidate_x_cat = candidate_x_cat[idx]
+            if candidate_y is not None:
+                candidate_y = candidate_y[idx]
         
         # encode query and candidates
         x = self._encode(x_num, x_cat)
         candidate_x = self._encode(candidate_x_num, candidate_x_cat)
-        x = self.backbone(x, candidate_x) # (B, F) -> (B, K, D) 
+        if candidate_y is not None:
+            # Provide label context
+            x = self.backbone(x, candidate_x, candidate_y) # (B, F) -> (B, K, D) 
+        else:
+            # Does not provide label context
+            x = self.backbone(x, candidate_x) # (B, F) -> (B, K, D) 
+        
         x = self.output(x) # (B, K, D) -> (B, K, D_OUT)
 
         return x        
@@ -795,17 +804,7 @@ def main(
         is_train is needed to avoid TabRM excluding every train data during evlauating on trainset.  
         
         """
-        
-        if config['model']['arch_type'] not in ['tabrm', 'tabrmv2', 'tabrmv2-mini']:
-            return (
-                model(
-                    dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
-                    dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
-                )
-                .squeeze(-1)  # Remove the last dimension for regression predictions.
-                .float()
-            )
-        elif config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini']:
+        if config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
             # is_train = (part == 'train')
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
@@ -825,9 +824,19 @@ def main(
                 if (candidate_idx is not None and 'x_cat' in dataset.data) else None
             )
 
-            return model(x_num, x_cat, candidate_x_num, candidate_x_cat).squeeze(-1).float()
+            return model(x_num, x_cat, candidate_x_num, candidate_x_cat).squeeze(-1).float()        
         else:
-            raise ValueError(f"Unknown arch_type {config['model']['arch_type']}.")
+            return (
+                model(
+                    dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None,
+                    dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None,
+                )
+                .squeeze(-1)  # Remove the last dimension for regression predictions.
+                .float()
+            )
+     
+        # else:
+        #     raise ValueError(f"Unknown arch_type {config['model']['arch_type']}.")
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
     def apply_model_tabr(part: PartKey, idx: Tensor) -> Tensor:
