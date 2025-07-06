@@ -307,6 +307,17 @@ class MLP(nn.Module):
             ]
         )
         self.output = None if d_out is None else nn.Linear(d_block, d_out)
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        # init MLPs
+        for block in self.blocks:
+            for layer in block:
+                if isinstance(layer, nn.Linear):
+                    init_rsqrt_uniform_(layer.weight, layer.in_features)
+                    if layer.bias is not None:
+                        init_rsqrt_uniform_(layer.bias, layer.in_features)
+
 
     def forward(self, x: Tensor) -> Tensor:
         for block in self.blocks:
@@ -882,6 +893,8 @@ class TabRMv2(TabRM):
         ])
 
 
+
+
 class TabRMv2Mini(TabRM):
     """
     Retrieve top-k neighbors and create k different views of query.
@@ -1042,58 +1055,44 @@ class TabRMv3(nn.Module):
             assert isinstance(self.label_encoder[0], nn.Embedding)
             nn.init.uniform_(self.label_encoder[0].weight, -1.0, 1.0)  # type: ignore[code]  # noqa: E501
 
-        # init MLPs
-        for block in self.mlp.blocks:
-            for layer in block:
-                if isinstance(layer, nn.Linear):
-                    init_rsqrt_uniform_(layer.weight, layer.in_features)
-                    if layer.bias is not None:
-                        init_rsqrt_uniform_(layer.bias, layer.in_features)
-
-        # below lines are not likely to be used.
-        if self.block.output is not None:
-            init_rsqrt_uniform_(self.block.output.weight, self.block.output.in_features)
-            if self.block.output.bias is not None:
-                init_rsqrt_uniform_(self.block.output.bias, self.block.output.in_features)
-
-        if self.output is not None:
-            init_rsqrt_uniform_(self.output.weight, self.output.in_features)
-            if self.output.bias is not None:
-                init_rsqrt_uniform_(self.output.bias, self.output.in_features)
 
     # @torch.no_grad()
-    def retrieve(self, x, candidate_x, y, candidate_y, is_train):
+    def retrieve(
+        self, x: Tensor, candidate_x: Tensor,
+        y: Tensor, candidate_y: Tensor, 
+        is_train: bool,
+    ):
         """
         Retrieve from candidates.
         During training, candidate_x is a subset of train dataset 
             for computational efficieny and stochasticity. 
         """
 
-        B, F = x.shape
+        B, _ = x.shape
         N, _ = candidate_x.shape
         
         # print(f"[Debug]: retrieve batch-size B={B}, pool-size N={N}, k={self.k}")
         # if N == 0:
         #     print(self.training)
 
-        x = self.embed(x) # (B, F) -> (B, D)
+        x_emb = self.embed(x) # (B, F) -> (B, D)
         with torch.set_grad_enabled(
             torch.is_grad_enabled() and not self.memory_efficient
         ):
-            candidate_xn = self.embed(candidate_x) 
+            candidate_x_emb = self.embed(candidate_x) 
 
         if is_train:
             assert y is not None
-            candidate_x = torch.cat([x, candidate_x])
+            candidate_x_emb = torch.cat([x_emb, candidate_x_emb])
             candidate_y = torch.cat([y, candidate_y])
         else:
             assert y is None
 
-        batch_size, d_block = x.shape
-        device = x.device
+        batch_size, d_block = x_emb.shape
+        device = x_emb.device
         with torch.no_grad():
-            candidate_xn_ = candidate_xn.to(torch.float32)
-            x_ = x.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
+            candidate_x_emb = candidate_x_emb.to(torch.float32)
+            x_emb = x_emb.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
 
             if self.search_index is None:
                 self.search_index = (
@@ -1104,11 +1103,11 @@ class TabRMv3(nn.Module):
                     else (faiss.IndexFlatL2)(d_block)
                 )
             self.search_index.reset()
-            self.search_index.add(candidate_xn_)
+            self.search_index.add(candidate_x_emb)
             distances: Tensor
             context_idx: Tensor
             distances, context_idx = self.search_index.search(
-                x_, self.context_size + (1 if is_train else 0)
+                x_emb, self.context_size + (1 if is_train else 0)
             )
 
             if is_train:
@@ -1122,33 +1121,38 @@ class TabRMv3(nn.Module):
             # the gradient of embedding of context are not being tracked.
             # thus, calculate the embedding once again to track gradient.   
             B, M = batch_size, self.context_size
-            context_x = candidate_x[context_idx.reshape(-1)] # (B*M)
-            context_x = self.embed(context_x).reshape(B, M, -1) # (B, M, D)
+            # context_x = context_x.to(dtype=torch.float32)
+            # with torch.cuda.amp.autocast(enabled=False):
+            candidate_x = torch.cat([x, candidate_x])
+            context_x = self.embed(candidate_x[context_idx.reshape(-1)])
+            context_x = context_x.reshape(B, M, -1)
         else:
             # the gradient of embedding of context are being tracked.   
-            context_x = candidate_xn[context_idx] # retrieve 
+            context_x = candidate_x_emb[context_idx] # retrieve 
 
         # Recompute similarites
         similarities = (
-            -x.square().sum(-1, keepdim=True)
-            + (2 * (x[..., None, :] @ context_x.transpose(-1, -2))).squeeze(-2)
+            -x_emb.square().sum(-1, keepdim=True)
+            + (2 * (x_emb[..., None, :] @ context_x.transpose(-1, -2))).squeeze(-2)
             - context_x.square().sum(-1)
         ) # (B, M)
         K = self.k
         N = self.num_neighbors_per_view # M // K
         similarities = similarities.reshape(B, K, N) 
         probs = F.softmax(similarities, dim=-1) # (B, K, N)
-        context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, M, D)
-        values = context_y_emb + self.T(x[:, None] - context_x) # (B, M, D)
+        # context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, M, D)
+        context_y_emb = self.label_encoder(candidate_y[context_idx][..., None].to(dtype=torch.float32))
+        values = context_y_emb + self.T(x_emb[:, None] - context_x) # (B, M, D)
         values = values.reshape(B, K, N, -1) # (B, K, N, D)
         context_x = torch.einsum("bkn,bknd->bkd", probs, values) # (B, K, D)
 
-        return x, context_x # (B, D), (B, K, D)
+        return x_emb, context_x # (B, D), (B, K, D)
 
 
     def forward(
             self, x: Tensor, candidate_x: Tensor,
             y: Tensor, candidate_y: Tensor, 
+            is_train: bool,
     ) -> Tensor:
         """
             inputs: 
@@ -1164,7 +1168,7 @@ class TabRMv3(nn.Module):
         """
 
         # return embeded query and keys 
-        x, context_x = self.retrieve(x, candidate_x, y, candidate_y) # (B, D), (B, K, D) 
+        x, context_x = self.retrieve(x, candidate_x, y, candidate_y, is_train) # (B, D), (B, K, D) 
         x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
         x = x + context_x # (B, K, D)
         x = self.block(x) # (B, K, D)

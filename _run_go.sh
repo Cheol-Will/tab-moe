@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # arch_type="moe-mini-sparse-shared"
 # arch_type="tabrm-piecewiselinear"
-arch_type="tabrmv2-mini-periodic"
+arch_type="tabrmv3-mini-periodic"
 # arch_type="tabrmv2-piecewiselinear"
 
 

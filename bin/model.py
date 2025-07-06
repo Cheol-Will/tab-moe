@@ -661,7 +661,7 @@ def main(
                 if key.startswith('x_') # modify to x_
                 # if key.startswith('X_')
             },
-            dataset.Y[part],
+            dataset.data['y'][part],
         )
         return (
             batch
@@ -835,16 +835,18 @@ def main(
             # For train data, it takes both y and candidate_y as inputs.
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
+            candidate_y = Y_train.to(
+                    torch.long if dataset.task.is_classification else torch.float
+                )
             if is_train:
                 mask = ~torch.isin(train_indices, idx)
                 candidate_idx = train_indices[mask]
-                _, y = get_Xy('train', idx)
-                _, candidate_y = get_Xy('train', candidate_idx)
+                y = candidate_y[idx]
             else:
                 candidate_idx = train_indices
                 y = None # For val and test data, no y is given.
-                _, candidate_y = get_Xy('train', candidate_idx)
-
+            candidate_y = candidate_y[candidate_idx]
+                
             candidate_x_num = (
                 dataset.data['x_num']['train'][candidate_idx]
                 if (candidate_idx is not None and 'x_num' in dataset.data) else None

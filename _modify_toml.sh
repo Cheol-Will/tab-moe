@@ -24,7 +24,7 @@ context_size = [
     "_tune_",
     "int",
     32,
-    128,
+    96,
     32
 ]
 n_blocks = [
