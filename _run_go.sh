@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # arch_type="moe-mini-sparse-shared"
 # arch_type="tabrm-piecewiselinear"
-# arch_type="tabrmv2-mini-periodic"
 arch_type="tabrmv2-mini-periodic"
+# arch_type="tabrmv2-piecewiselinear"
 
 
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")

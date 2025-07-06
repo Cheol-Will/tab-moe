@@ -1,6 +1,10 @@
 import itertools
 from typing import Any, Literal
+import math
 
+import delu
+import faiss
+import faiss.contrib.torch_utils  #  
 import rtdl_num_embeddings
 import rtdl_revisiting_models
 import torch
@@ -730,7 +734,7 @@ class TabRM(nn.Module):
                 init_rsqrt_uniform_(self.output.bias, self.output.in_features)
 
     # @torch.no_grad()
-    def retrieve(self, x, candidate_x):
+    def retrieve(self, x, candidate_x, is_train: bool,):
         """
         Retrieve from candidate_x.
         During training, candidate_x is a subset of train dataset 
@@ -744,45 +748,67 @@ class TabRM(nn.Module):
         # if N == 0:
         #     print(self.training)
 
-        x = self.embed(x) # (B, F) -> (B, D)
+        x_ = self.embed(x) # (B, F) -> (B, D)
         with torch.set_grad_enabled(
             torch.is_grad_enabled() and not self.memory_efficient
         ):
             candidate_xn = self.embed(candidate_x) 
 
-        batch_size, d_block = x.shape
+        # Include x itself during training
+        if is_train:
+            candidate_xn = torch.cat([x_, candidate_xn])
+
+        batch_size, d_block = x_.shape
+        device = x_.device
         with torch.no_grad():
             candidate_xn_ = candidate_xn.to(torch.float32)
-            x_ = x.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
+            x_ = x_.to(torch.float32) # need to convert to float 32 since the benchmark uses AMP with FP16
 
             if self.search_index is None:
                 self.search_index = (
                     (
                         faiss.GpuIndexFlatL2 # defulat L2 distance
                     )(faiss.StandardGpuResources(), d_block)
-                    if x.device.type == 'cuda'
+                    if x_.device.type == 'cuda'
                     else (faiss.IndexFlatL2)(d_block)
                 )
             self.search_index.reset()
             self.search_index.add(candidate_xn_)
             context_idx: Tensor
-            _, context_idx = self.search_index.search(
-                x_, self.k
+            distances, context_idx = self.search_index.search(
+                x_, self.k + (1 if is_train else 0)
             )
+            if is_train:
+                # Mask its own distance
+                distances[
+                    context_idx == torch.arange(batch_size, device=device)[:, None]
+                ] = torch.inf
+                # Not the most elegant solution to remove the argmax, but anyway.
+                context_idx = context_idx.gather(-1, distances.argsort()[:, :-1])
         
         if self.memory_efficient and torch.is_grad_enabled():
-            # the gradient of embedding of context are not being tracked.
-            # thus, calculate the embedding once again to track gradient.   
-            B, K = batch_size, self.k
-            context_x = candidate_x[context_idx.reshape(-1)] # (B*K)
-            context_x = self.embed(context_x).reshape(B, K, -1) 
+            assert is_train
+            # Repeating the same computation,
+            # but now only for the context objects and with autograd on.
+            # x is already computed with autograd on
+            # Thus, just concat them and get context_x
+            candidate_x_ = torch.cat([x, candidate_x])
+            context_x = self.embed(candidate_x_[context_idx.reshape(-1)])
+            context_x = context_x.reshape(batch_size, self.k, -1)
         else:
-            # the gradient of embedding of context are being tracked.   
+            # the gradient of embedding of context are being tracked. 
             context_x = candidate_xn[context_idx] # retrieve 
+        # print("[Debug] in retrieve") 
+        # print(f"shape of x: {x_.shape}")
+        # print(f"shape of context_x: {context_x.shape}")
 
-        return x, context_x # (B, D), (B, K, D)
+        # print("candidate_x.shape[0]:", candidate_x.shape[0])
+        # print("context_idx.max():", context_idx.max())
+        # print("context_idx.min():", context_idx.min())
 
-    def forward(self, x: Tensor, candidate_x) -> Tensor:
+        return x_, context_x # (B, D), (B, K, D)
+
+    def forward(self, x: Tensor, candidate_x, is_train: bool = True) -> Tensor:
         """
             inputs: 
             x: tensor (B, F)
@@ -794,14 +820,19 @@ class TabRM(nn.Module):
               thus, successive may use NLINEAR.
         """
 
-        # return embeded query and keys 
-        x, context_x = self.retrieve(x, candidate_x) # (B, D), (B, K, D) 
-        
+        # return embeded query and keys
+        # print("[Debug] forward input") 
+        # print(f"shape of x: {x.shape}")
+        x, context_x = self.retrieve(x, candidate_x, is_train) # (B, D), (B, K, D) 
         x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
         x = torch.cat([x, context_x], dim=-1)  # (B, K, 2D)
+        # print("[Debug] in forward") 
+        # print(f"shape of x after cat: {x.shape}")
         x = self.mlp(x) # (B, K, 2D)
         if self.output is not None:
             x = self.output(x)   # (B, d_out)
+        # print("[Debug] in forward") 
+        # print(f"shape of output: {x.shape}")
 
         # concat query x and keys -> (B, K, D), which is k different views of query.
         # Keep in mind that self.output should be NLINEAR since this class outputs k-multiple predictions
@@ -899,8 +930,9 @@ class TabRMv2Mini(TabRM):
 
 class TabRMv3(nn.Module):
     """
-    Retrieve top-k neighbors and create different views of query with label context.
-    Generate multiple predictions. 
+    Retrieve top-m neighbors and split them into k groups to create k different views of the query.
+    Each view uses n (=m/k) neighbors to build its own label-informed context.
+    Generate k predictions based on the k views.    
     """
     
     def __init__(
@@ -912,14 +944,17 @@ class TabRMv3(nn.Module):
         d_block: int,
         dropout: float,
         activation: str = "ReLU",
-        k: int = 32,
-        # sample_rate: float = 0.8,
+        k: int = 16,
+        context_size: int = 64,
         memory_efficient: bool = True,
+        n_classes: int = None,
+        ensemble_type: str = "batch",
     ) -> None:
         super(TabRM, self).__init__()
         d_in = d_block if d_in is None else d_in
 
-        # embedding process: 
+        # >>> E
+        # ModernNCA style embedding layer
         # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> BatchNorm
         self.embed = nn.Sequential(*[
             nn.Linear(d_in, d_block),
@@ -927,30 +962,67 @@ class TabRMv3(nn.Module):
             nn.BatchNorm1d(d_block),
         ])
 
-        # 
-        self.label_encoder = None
-        self.T = None
-
-        # [linear -> ReLU -> Dropout] x n_blocks
-        # Since TabRM forms K separate views by concatenating the query with each retrieved key vector
-        # hidden dimension is 2*d_block
-        self.mlp = MLP(
-            d_in=2*d_block, 
-            n_blocks=n_blocks, 
-            d_block=2*d_block, 
-            dropout=dropout, 
-            activation=activation
+        # >>> R
+        # TabR Style label encoder and Transformation layer
+        self.label_encoder = (
+            nn.Linear(1, d_block)
+            if n_classes is None # None for Regression
+            else nn.Sequential(
+                nn.Embedding(n_classes, d_block), delu.nn.Lambda(lambda x: x.squeeze(-2))
+            )
+        )
+        self.T = nn.Sequential(
+            nn.Linear(d_block, d_block),
+            getattr(nn, activation)(),
+            nn.Dropout(dropout),
+            nn.Linear(d_block, d_block, bias=False),
         )
 
-        self.output = None if d_out is None else nn.Linear(2*d_block, d_out)
+        # Block takes k different views of query with label context.
+        if ensemble_type == "batch":
+            # batch-ensemble x N
+            self.block = nn.Sequential(*[
+            LinearEfficientEnsemble(
+                in_features=d_block,
+                out_features=d_block,
+                bias=True,
+                k=k, # the number of ensemble
+                ensemble_scaling_in=True,
+                ensemble_scaling_out=True,
+                ensemble_bias=True,
+                scaling_init='ones' # initialize scale parameters (adapter) with 1.
+            )
+            for _ in range(n_blocks)                
+            ])
+        elif ensemble_type == "mini":
+            # Adapter + MLP x N
+            self.block = nn.Sequential(*[
+                ScaleEnsemble(
+                    k,
+                    d_block,
+                    init='random-signs',
+                ),
+                MLP(
+                d_in=d_block, 
+                n_blocks=n_blocks, 
+                d_block=d_block, 
+                dropout=dropout, 
+                activation=activation
+                )
+            ])
+        else:
+            raise ValueError(f"Unknown ensemble_type: {ensemble_type}")
+
+        self.output = None if d_out is None else nn.Linear(2*d_block, d_out) # usually not used
 
         self.d_in = d_in
         self.d_block = d_block
         self.n_blocks = n_blocks
         self.k = k
+        self.context_size = context_size
+        self.num_neighbors_per_view = context_size // k
         self.search_index = None
         self.memory_efficient = memory_efficient
-
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -960,6 +1032,15 @@ class TabRMv3(nn.Module):
                 init_rsqrt_uniform_(module.weight, module.in_features)
                 if module.bias is not None:
                     init_rsqrt_uniform_(module.bias, module.in_features)
+
+        # init label encoder
+        if isinstance(self.label_encoder, nn.Linear):
+            bound = 1 / math.sqrt(2.0)
+            nn.init.uniform_(self.label_encoder.weight, -bound, bound)  # type: ignore[code]  # noqa: E501
+            nn.init.uniform_(self.label_encoder.bias, -bound, bound)  # type: ignore[code]  # noqa: E501
+        else:
+            assert isinstance(self.label_encoder[0], nn.Embedding)
+            nn.init.uniform_(self.label_encoder[0].weight, -1.0, 1.0)  # type: ignore[code]  # noqa: E501
 
         # init MLPs
         for block in self.mlp.blocks:
@@ -981,7 +1062,7 @@ class TabRMv3(nn.Module):
                 init_rsqrt_uniform_(self.output.bias, self.output.in_features)
 
     # @torch.no_grad()
-    def retrieve(self, x, candidate_x, y, candidate_y):
+    def retrieve(self, x, candidate_x, y, candidate_y, is_train):
         """
         Retrieve from candidates.
         During training, candidate_x is a subset of train dataset 
@@ -1001,7 +1082,7 @@ class TabRMv3(nn.Module):
         ):
             candidate_xn = self.embed(candidate_x) 
 
-        if self.training:
+        if is_train:
             assert y is not None
             candidate_x = torch.cat([x, candidate_x])
             candidate_y = torch.cat([y, candidate_y])
@@ -1027,10 +1108,10 @@ class TabRMv3(nn.Module):
             distances: Tensor
             context_idx: Tensor
             distances, context_idx = self.search_index.search(
-                x_, self.k + (1 if self.training else 0)
+                x_, self.context_size + (1 if is_train else 0)
             )
 
-            if self.training:
+            if is_train:
                 distances[
                     context_idx == torch.arange(batch_size, device=device)[:, None]
                 ] = torch.inf
@@ -1040,44 +1121,29 @@ class TabRMv3(nn.Module):
         if self.memory_efficient and torch.is_grad_enabled():
             # the gradient of embedding of context are not being tracked.
             # thus, calculate the embedding once again to track gradient.   
-            B, K = batch_size, self.k
-            context_x = candidate_x[context_idx.reshape(-1)] # (B*K)
-            context_x = self.embed(context_x).reshape(B, K, -1) # (B, K, D)
+            B, M = batch_size, self.context_size
+            context_x = candidate_x[context_idx.reshape(-1)] # (B*M)
+            context_x = self.embed(context_x).reshape(B, M, -1) # (B, M, D)
         else:
             # the gradient of embedding of context are being tracked.   
             context_x = candidate_xn[context_idx] # retrieve 
-
 
         # Recompute similarites
         similarities = (
             -x.square().sum(-1, keepdim=True)
             + (2 * (x[..., None, :] @ context_x.transpose(-1, -2))).squeeze(-2)
             - context_x.square().sum(-1)
-        )
-
-        #
-        #          
-        #          
-        # reshape similarities so that we can get k groups.
-        # Let's just sample indicies from context_idx
-        # for example, make it 4 groups of indicies.
-        # and calclate probs for each group
-        # create context_x for each group
-        # return them. and use context + x (B, K, D)
-        # so that 
-        probs = F.softmax(similarities, dim=-1)
-
-
-        context_y_emb = self.label_encoder(candidate_y[context_idx][..., None])
-        values = context_y_emb + self.T(x[:, None] - context_x)
-        
-        # how to shape context x?
-        # what if I want to make it (B, K, D)
-        # so that we can have diverse view of x.
-        context_x = (probs[:, None] @ values).squeeze(1)
+        ) # (B, M)
+        K = self.k
+        N = self.num_neighbors_per_view # M // K
+        similarities = similarities.reshape(B, K, N) 
+        probs = F.softmax(similarities, dim=-1) # (B, K, N)
+        context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, M, D)
+        values = context_y_emb + self.T(x[:, None] - context_x) # (B, M, D)
+        values = values.reshape(B, K, N, -1) # (B, K, N, D)
+        context_x = torch.einsum("bkn,bknd->bkd", probs, values) # (B, K, D)
 
         return x, context_x # (B, D), (B, K, D)
-
 
 
     def forward(
@@ -1099,23 +1165,12 @@ class TabRMv3(nn.Module):
 
         # return embeded query and keys 
         x, context_x = self.retrieve(x, candidate_x, y, candidate_y) # (B, D), (B, K, D) 
-        
-
- 
-        # Now how to use context? 
-
-        # split or ......
-
-
         x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
-        x = torch.cat([x, context_x], dim=-1)  # (B, K, 2D)
-        x = self.mlp(x) # (B, K, 2D)
+        x = x + context_x # (B, K, D)
+        x = self.block(x) # (B, K, D)
+        
         if self.output is not None:
             x = self.output(x)   # (B, d_out)
-
-        # concat query x and keys -> (B, K, D), which is k different views of query.
-        # Keep in mind that self.output should be NLINEAR since this class outputs k-multiple predictions
-
         return x
 
 

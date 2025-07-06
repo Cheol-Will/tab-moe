@@ -1,0 +1,73 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 6,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/california",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0029551612567654496,
+            "weight_decay": 0.039783907788071865
+        },
+        "model": {
+            "arch_type": "tabrmv2-mini",
+            "sample_rate": 0.473177289080142,
+            "k": 128,
+            "backbone": {
+                "n_blocks": 2,
+                "d_block": 256,
+                "dropout": 0.10204495786766768
+            },
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 52,
+                "d_embedding": 24,
+                "frequency_init_scale": 0.2384330307980952,
+                "lite": false
+            }
+        }
+    },
+    "n_parameters": 859104,
+    "prediction_type": "labels",
+    "epoch_size": 52,
+    "best_step": 2652,
+    "metrics": {
+        "train": {
+            "rmse": 0.3744816973215615,
+            "mae": 0.25814974308013916,
+            "r2": 0.8958873959505607,
+            "score": -0.3744816973215615
+        },
+        "val": {
+            "rmse": 0.4686442255842017,
+            "mae": 0.30313819646835327,
+            "r2": 0.8315572435604567,
+            "score": -0.4686442255842017
+        },
+        "test": {
+            "rmse": 0.4601000111900134,
+            "mae": 0.30458247661590576,
+            "r2": 0.8376538809762848,
+            "score": -0.4601000111900134
+        }
+    },
+    "time": "0:01:02.871861",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        64,
+        1
+    ],
+    "head_selection_time": "0:00:00.261393"
+}

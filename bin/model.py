@@ -475,6 +475,9 @@ class ModelTabRM(nn.Module):
             self.backbone = lib.deep.TabRMv2(d_in=d_flat, k=k, **backbone)
         elif arch_type == "tabrmv2-mini":
             self.backbone = lib.deep.TabRMv2Mini(d_in=d_flat, k=k, **backbone)
+        elif arch_type == "tabrmv3":
+            # config of backbone has ensemble type (batch, mini)
+            self.backbone = lib.deep.TabRMv3(d_in=d_flat, k=k, **backbone)
         else: 
             raise ValueError(f"Unknown arch_type: {arch_type}")
 
@@ -484,7 +487,10 @@ class ModelTabRM(nn.Module):
 
         d_block = backbone['d_block']
         d_out = 1 if n_classes is None else n_classes
-        self.output = lib.deep.NLinear(k, 2*d_block, d_out)  # type: ignore[code]
+        if arch_type not in ['tabrmv3']:
+            self.output = lib.deep.NLinear(k, 2*d_block, d_out)  # type: ignore[code]
+        else:
+            self.output = lib.deep.NLinear(k, d_block, d_out)  # type: ignore[code]
 
         # >>>
         self.arch_type = arch_type
@@ -510,6 +516,7 @@ class ModelTabRM(nn.Module):
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None, 
         candidate_x_num: None | Tensor = None, candidate_x_cat: None | Tensor = None,
         y: None | Tensor = None, candidate_y: None | Tensor = None,
+        is_train: bool = True,
     ) -> Tensor:
 
         # During training, sample a subset of the candidates
@@ -531,12 +538,10 @@ class ModelTabRM(nn.Module):
         # encode query and candidates
         x = self._encode(x_num, x_cat)
         candidate_x = self._encode(candidate_x_num, candidate_x_cat)
-        if candidate_y is not None:
-            # Provide label context
-            x = self.backbone(x, candidate_x, candidate_y) # (B, F) -> (B, K, D) 
+        if self.arch_type not in ['tabrmv3']:
+            x = self.backbone(x, candidate_x, is_train) # (B, F) -> (B, K, D) 
         else:
-            # Does not provide label context
-            x = self.backbone(x, candidate_x) # (B, F) -> (B, K, D) 
+            x = self.backbone(x, candidate_x, y, candidate_y, is_train) # (B, F) -> (B, K, D) 
         
         x = self.output(x) # (B, K, D) -> (B, K, D_OUT)
 
@@ -799,13 +804,13 @@ def main(
         evaluation_mode = torch.inference_mode
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
-    def apply_model(part: PartKey, idx: Tensor, is_train: bool = True) -> Tensor:
+    def apply_model(part: PartKey, idx: Tensor) -> Tensor:
         """
         is_train is needed to avoid TabRM excluding every train data during evlauating on trainset.  
-        
         """
-        if config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
-            # is_train = (part == 'train')
+        is_train = (part == 'train')
+
+        if config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini',]:
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
 
@@ -824,7 +829,32 @@ def main(
                 if (candidate_idx is not None and 'x_cat' in dataset.data) else None
             )
 
-            return model(x_num, x_cat, candidate_x_num, candidate_x_cat).squeeze(-1).float()        
+            return model(x_num, x_cat, candidate_x_num, candidate_x_cat, is_train).squeeze(-1).float()        
+        elif config['model']['arch_type'] in ['tabrmv3']:
+            # Note that tabrmv3 requires candidate_y.
+            # For train data, it takes both y and candidate_y as inputs.
+            x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
+            x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
+            if is_train:
+                mask = ~torch.isin(train_indices, idx)
+                candidate_idx = train_indices[mask]
+                _, y = get_Xy('train', idx)
+                _, candidate_y = get_Xy('train', candidate_idx)
+            else:
+                candidate_idx = train_indices
+                y = None # For val and test data, no y is given.
+                _, candidate_y = get_Xy('train', candidate_idx)
+
+            candidate_x_num = (
+                dataset.data['x_num']['train'][candidate_idx]
+                if (candidate_idx is not None and 'x_num' in dataset.data) else None
+            )
+            candidate_x_cat = (
+                dataset.data['x_cat']['train'][candidate_idx]
+                if (candidate_idx is not None and 'x_cat' in dataset.data) else None
+            )
+
+            return model(x_num, x_cat, candidate_x_num, candidate_x_cat, y, candidate_y, is_train).squeeze(-1).float()        
         else:
             return (
                 model(
@@ -838,23 +868,7 @@ def main(
         # else:
         #     raise ValueError(f"Unknown arch_type {config['model']['arch_type']}.")
 
-    @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
-    def apply_model_tabr(part: PartKey, idx: Tensor) -> Tensor:
-        """
-        Call forward of retrieval-based model. 
-        Model takes x (query), candidate_x.
-        During training, exclude current mini-batch index.   
-        Note that you get y as well as x, but do not use y in TabRM.
-        """
-        is_train = part == 'train'
-        x, y = get_Xy(part, idx)
-        return model(
-            x,
-            *get_Xy(
-                'train',
-                train_indices[~torch.isin(train_indices, idx)] if is_train else None,
-            ),
-        ).squeeze(-1)
+
 
 
     @evaluation_mode()
@@ -871,7 +885,7 @@ def main(
                     head_predictions[part] = (
                         torch.cat(
                             [
-                                apply_model(part, idx, is_train=False)
+                                apply_model(part, idx)
                                 for idx in torch.arange(
                                     dataset.size(part), device=device
                                 ).split(eval_batch_size)
