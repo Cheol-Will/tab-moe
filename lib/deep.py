@@ -514,7 +514,10 @@ class MultiViewMoEBlock(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        init_rsqrt_uniform_(self.router, self.router.shape[-1])
+        init_rsqrt_uniform_(self.router.weight, self.router.in_features)
+        if self.router.bias is not None:
+            init_rsqrt_uniform_(self.router.bias, self.router.in_features)
+
         init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
         init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
         init_rsqrt_uniform_(self.bias1, self.bias1.shape[-1])
@@ -522,19 +525,28 @@ class MultiViewMoEBlock(nn.Module):
         
     def forward(self, x):
         B, K, D = x.shape
-        routed_logits = self.router(x) # (B, K, E)
-        routed_idx = torch.argmax(routed_logits, dim=-1) # (B, K)
-        w1_routed = self.weights1[routed_idx] # (B, K, D, H)
-        w2_routed = self.weights2[routed_idx] # (B, K, H, D)
-        b1_routed = self.bias1[routed_idx] # (B, K, H)
-        b2_routed = self.bias2[routed_idx] # (B, K, H)
-        
-        x = torch.einsum("bkd,bkdh->bkh", x, w1_routed) + b1_routed # (B, K, H)
-        x = self.dropout1(self.act1(x))
-        x = torch.einsum("bkh,bkhd->bkd", x, w2_routed) + b2_routed # (B, K, D)
-        x = self.dropout2(self.act2(x))
 
-        return x  
+        x_flat = x.view(-1, D) # (B*K, D)
+        out_flat = torch.empty_like(x_flat)  # (B*K, D)
+
+        logits = self.router(x_flat)           # (B*K, E)
+        routed_idx = torch.argmax(logits, dim=-1)  # (B*K)
+
+        for e in range(self.num_experts):
+            mask = routed_idx == e  # (B*K), bool
+            if not mask.any():
+                continue  # skip
+
+            x_e = x_flat[mask]  # (N_e, D) where N_e is the number of tokens routed to expert e.
+            x_e = x_e @ self.weights1[e] + self.bias1[e]
+            x_e = self.dropout1(self.act1(x_e))
+            x_e = x_e @ self.weights2[e] + self.bias2[e]
+            x_e = self.dropout1(self.act1(x_e))
+            
+            out_flat[mask] = x_e  # insert in (N_e, D) 
+        
+        return out_flat.view(B, K, D)  #  (B, K, D)
+
 
 class MoESparse(nn.Module):
     """
