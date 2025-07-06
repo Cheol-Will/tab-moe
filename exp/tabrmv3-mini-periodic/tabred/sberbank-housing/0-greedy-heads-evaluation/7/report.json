@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 7,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 4.0007863200687915e-05,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "tabrmv3",
+            "sample_rate": 0.41476163626332785,
+            "k": 32,
+            "backbone": {
+                "ensemble_type": "mini",
+                "context_size": 32,
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.09047343813523749
+            },
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 24,
+                "d_embedding": 16,
+                "frequency_init_scale": 2.639461865974056,
+                "lite": false
+            }
+        }
+    },
+    "n_parameters": 7286152,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 3256,
+    "metrics": {
+        "train": {
+            "rmse": 0.26979639308181874,
+            "mae": 0.15264856815338135,
+            "r2": 0.5349644850729492,
+            "score": -0.26979639308181874
+        },
+        "val": {
+            "rmse": 0.25117514505823546,
+            "mae": 0.14457345008850098,
+            "r2": 0.5785902624315797,
+            "score": -0.25117514505823546
+        },
+        "test": {
+            "rmse": 0.2693214152558678,
+            "mae": 0.18758057057857513,
+            "r2": 0.504342891903317,
+            "score": -0.2693214152558678
+        }
+    },
+    "time": "0:07:12.215637",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        1,
+        4,
+        0
+    ],
+    "head_selection_time": "0:00:00.081361"
+}
