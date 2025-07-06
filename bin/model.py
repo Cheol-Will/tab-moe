@@ -475,7 +475,7 @@ class ModelTabRM(nn.Module):
             self.backbone = lib.deep.TabRMv2(d_in=d_flat, k=k, **backbone)
         elif arch_type == "tabrmv2-mini":
             self.backbone = lib.deep.TabRMv2Mini(d_in=d_flat, k=k, **backbone)
-        elif arch_type == "tabrmv3":
+        elif arch_type in ["tabrmv3", "tabrmoe"]:
             # config of backbone has ensemble type (batch, mini)
             self.backbone = lib.deep.TabRMv3(d_in=d_flat, k=k, **backbone)
         else: 
