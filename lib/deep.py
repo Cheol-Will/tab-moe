@@ -1051,10 +1051,10 @@ class TabRMv3(nn.Module):
                         init_rsqrt_uniform_(layer.bias, layer.in_features)
 
         # below lines are not likely to be used.
-        if self.mlp.output is not None:
-            init_rsqrt_uniform_(self.mlp.output.weight, self.mlp.output.in_features)
-            if self.mlp.output.bias is not None:
-                init_rsqrt_uniform_(self.mlp.output.bias, self.mlp.output.in_features)
+        if self.block.output is not None:
+            init_rsqrt_uniform_(self.block.output.weight, self.block.output.in_features)
+            if self.block.output.bias is not None:
+                init_rsqrt_uniform_(self.block.output.bias, self.block.output.in_features)
 
         if self.output is not None:
             init_rsqrt_uniform_(self.output.weight, self.output.in_features)
