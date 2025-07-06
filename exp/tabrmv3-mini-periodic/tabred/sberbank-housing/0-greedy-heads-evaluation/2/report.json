@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 4.0007863200687915e-05,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "tabrmv3",
+            "sample_rate": 0.41476163626332785,
+            "k": 32,
+            "backbone": {
+                "ensemble_type": "mini",
+                "context_size": 32,
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.09047343813523749
+            },
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 24,
+                "d_embedding": 16,
+                "frequency_init_scale": 2.639461865974056,
+                "lite": false
+            }
+        }
+    },
+    "n_parameters": 7286152,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 3922,
+    "metrics": {
+        "train": {
+            "rmse": 0.2736807150233846,
+            "mae": 0.1454143524169922,
+            "r2": 0.5214776775238568,
+            "score": -0.2736807150233846
+        },
+        "val": {
+            "rmse": 0.2505943713177496,
+            "mae": 0.14458067715168,
+            "r2": 0.5805367906973197,
+            "score": -0.2505943713177496
+        },
+        "test": {
+            "rmse": 0.27719034062320214,
+            "mae": 0.19612005352973938,
+            "r2": 0.47495594856269596,
+            "score": -0.27719034062320214
+        }
+    },
+    "time": "0:08:23.839191",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        0,
+        1,
+        3
+    ],
+    "head_selection_time": "0:00:00.083752"
+}
