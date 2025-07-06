@@ -483,7 +483,58 @@ class MoEBlockEinSum(nn.Module):
             return x, indices # return routing if needed
         else:
             return x 
-    
+
+class MultiViewMoEBlock(nn.Module):
+    """
+    Top-1 routing mixture of experts block
+    that takes multiple view of query as input. 
+    """
+    def __init__(
+        self,
+        d_block: int,
+        moe_ratio: float = 0.25,
+        dropout: float = 0.0,
+        num_experts: int = 32,
+        activation: str = 'ReLU',
+    ):
+        super(MultiViewMoEBlock, self).__init__()
+        d_hidden = int(d_block * moe_ratio)
+
+        self.router = nn.Linear(d_block, num_experts)
+        self.weights1 = nn.Parameter(torch.empty(num_experts, d_block, d_hidden))
+        self.bias1 = nn.Parameter(torch.empty(num_experts, d_hidden))
+        self.act1 = getattr(nn, activation)()
+        self.dropout1 = nn.Dropout(dropout)  
+        self.weights2 = nn.Parameter(torch.empty(num_experts, d_hidden, d_block))
+        self.bias2 = nn.Parameter(torch.empty(num_experts, d_block))
+        self.act2 = getattr(nn, activation)()
+        self.dropout2 = nn.Dropout(dropout)
+        
+        self.num_experts = num_experts
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init_rsqrt_uniform_(self.router, self.router.shape[-1])
+        init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
+        init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
+        init_rsqrt_uniform_(self.bias1, self.bias1.shape[-1])
+        init_rsqrt_uniform_(self.bias2, self.bias2.shape[-1])
+        
+    def forward(self, x):
+        B, K, D = x.shape
+        routed_logits = self.router(x) # (B, K, E)
+        routed_idx = torch.argmax(routed_logits, dim=-1) # (B, K)
+        w1_routed = self.weights1[routed_idx] # (B, K, D, H)
+        w2_routed = self.weights2[routed_idx] # (B, K, H, D)
+        b1_routed = self.bias1[routed_idx] # (B, K, H)
+        b2_routed = self.bias2[routed_idx] # (B, K, H)
+        
+        x = torch.einsum("bkd,bkdh->bkh", x, w1_routed) + b1_routed # (B, K, H)
+        x = self.dropout1(self.act1(x))
+        x = torch.einsum("bkh,bkhd->bkd", x, w2_routed) + b2_routed # (B, K, D)
+        x = self.dropout2(self.act2(x))
+
+        return x  
 
 class MoESparse(nn.Module):
     """
@@ -680,7 +731,6 @@ class TabRM(nn.Module):
         dropout: float,
         activation: str = "ReLU",
         k: int = 32,
-        # sample_rate: float = 0.8,
         memory_efficient: bool = True,
     ) -> None:
         super(TabRM, self).__init__()
@@ -711,7 +761,6 @@ class TabRM(nn.Module):
         self.d_block = d_block
         self.n_blocks = n_blocks
         self.k = k
-        # self.sample_rate = sample_rate # for subset sampling during trainig
         self.search_index = None
         self.memory_efficient = memory_efficient
 
@@ -850,6 +899,37 @@ class TabRM(nn.Module):
 
         return x
 
+class TabRMoE(TabRM):
+    """
+    
+    
+    """
+    def __init__(
+     self,
+        *,
+        d_in: int | None = None,
+        d_out: int | None = None,
+        n_blocks: int,
+        d_block: int,
+        dropout: float,
+        activation: str = "ReLU",
+        k: int = 32,
+        memory_efficient: bool = True,
+    ):
+        super().__init__(
+            d_in=d_in,
+            d_out=d_out,
+            n_blocks=n_blocks,
+            d_block=d_block,
+            dropout=dropout,
+            activation=activation,
+            k=k,
+            memory_efficient=memory_efficient,
+        )
+
+        self.mlp = None
+
+
 class TabRMv2(TabRM):
     """
     Retrieve top-k neighbors and create k different views of query.
@@ -865,7 +945,6 @@ class TabRMv2(TabRM):
         dropout: float,
         activation: str = "ReLU",
         k: int = 32,
-        # sample_rate: float = 0.8,
         memory_efficient: bool = True,
     ) -> None:
         super().__init__(
@@ -891,9 +970,6 @@ class TabRMv2(TabRM):
             )
             for _ in range(n_blocks)
         ])
-
-
-
 
 class TabRMv2Mini(TabRM):
     """
@@ -962,6 +1038,8 @@ class TabRMv3(nn.Module):
         memory_efficient: bool = True,
         n_classes: int = None,
         ensemble_type: str = "batch",
+        moe_ratio: float = None,
+        num_experts: int = None,
     ) -> None:
         super(TabRMv3, self).__init__()
         d_in = d_block if d_in is None else d_in
@@ -1022,6 +1100,17 @@ class TabRMv3(nn.Module):
                 dropout=dropout, 
                 activation=activation
                 )
+            ])
+        elif ensemble_type == "moe":
+            self.block = nn.Sequential(*[
+                MultiViewMoEBlock(
+                    d_block=d_block,
+                    moe_ratio=moe_ratio,
+                    dropout=dropout,
+                    num_experts=num_experts,
+                    activation=activation,
+                )
+                for _ in range(n_blocks)
             ])
         else:
             raise ValueError(f"Unknown ensemble_type: {ensemble_type}")
