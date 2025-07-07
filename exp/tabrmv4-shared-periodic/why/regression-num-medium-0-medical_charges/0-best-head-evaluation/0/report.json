@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "batch_size": 512,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-medical_charges",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0002493410895317479,
+            "weight_decay": 0.00010351051745389851
+        },
+        "model": {
+            "arch_type": "tabrmv3",
+            "sample_rate": 0.41042113933358354,
+            "k": 4,
+            "backbone": {
+                "embed_type": "tabr",
+                "ensemble_type": "shared-resnet",
+                "context_shuffle": false,
+                "context_size": 256,
+                "encoder_n_blocks": 0,
+                "n_blocks": 1,
+                "d_block": 384,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 64,
+                "d_embedding": 24,
+                "frequency_init_scale": 0.17135981919273977,
+                "lite": false
+            }
+        }
+    },
+    "n_parameters": 631564,
+    "prediction_type": "labels",
+    "epoch_size": 20,
+    "best_step": 1280,
+    "metrics": {
+        "train": {
+            "rmse": 0.07959870716192541,
+            "mae": 0.05227033048868179,
+            "r2": 0.9797706647138512,
+            "score": -0.07959870716192541
+        },
+        "val": {
+            "rmse": 0.08229816246148264,
+            "mae": 0.05269463360309601,
+            "r2": 0.9789067193378818,
+            "score": -0.08229816246148264
+        },
+        "test": {
+            "rmse": 0.08164458596052644,
+            "mae": 0.052424486726522446,
+            "r2": 0.9792901962674558,
+            "score": -0.08164458596052644
+        }
+    },
+    "time": "0:01:33.323380",
+    "chunk_size": null,
+    "eval_batch_size": 16384,
+    "heads": [
+        0
+    ],
+    "head_selection_time": "0:00:00.004500"
+}
