@@ -703,10 +703,12 @@ class MLPBlock(nn.Module):
         d_block: int, 
         dropout: float, 
         activation: str = "ReLU",
+        prenorm: bool = True,
     ):
         super().__init__()
+        
         self.block = nn.Sequential(
-            nn.BatchNorm1d(d_in),
+            nn.BatchNorm1d(d_in) if prenorm else nn.Identity(),
             nn.Linear(d_in, d_block),
             getattr(nn, activation)(),
             nn.Dropout(dropout),
@@ -1095,9 +1097,14 @@ class TabRMv3(nn.Module):
 
         # Block takes k different views of query with label context.
         # need to add ensemble_type == "no" or "basic" or "mlp" or whatever IDK.
+        if ensemble_type == "shared-mlp":
+            layers = []
+            for _ in range(n_blocks):
+                layers.append(MLPBlock(d_block, d_block, dropout, activation, prenorm=False))
+                layers.append(nn.Dropout(dropout))
+            self.block = nn.Sequential(*layers)    
 
-        
-        if ensemble_type == "batch":
+        elif ensemble_type == "batch":
             # batch-ensemble x N
             # [Adapter - Weight - Adapter] x N
             self.block = nn.Sequential(*[
