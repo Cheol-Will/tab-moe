@@ -3,7 +3,8 @@
 # arch_type="tabrm-piecewiselinear"
 # arch_type="tabrmv2-piecewiselinear"
 # arch_type="tabrmoev3-periodic"
-arch_type="tabrmoev3-periodic"
+# arch_type="tabrmoev3-periodic"
+arch_type="tabrmv3-mini-cs-periodic"
 
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")
 data_list=(

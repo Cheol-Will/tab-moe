@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Check the destination root!!
 # DEST_ROOT="exp/mlp-debug2"
-DEST_ROOT="exp/tabrmoev3-periodic"
+DEST_ROOT="exp/tabrmv3-mini-cs-periodic"
 
 # 1) Define replacement block
 BLOCK=$(cat << 'EOF'
@@ -25,7 +25,8 @@ k = [
 ]
 
 [space.model.backbone]
-ensemble_type = "moe"
+ensemble_type = "mini"
+context_shuffle = true
 context_size = [
     "_tune_",
     "int",
@@ -51,7 +52,7 @@ n_blocks = [
     "_tune_",
     "int",
     1,
-    2,
+    3,
 ]
 d_block = [
     "_tune_",

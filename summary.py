@@ -116,6 +116,9 @@ def print_tuning_time(model):
     total.to_csv(f"searching_time_{model}.csv", header=["total_time"])
 
 def calculate_ranks(merged: pd.DataFrame, model_cols: list[str]) -> pd.DataFrame:
+    if model_cols is None:
+        model_cols = merged.columns
+        model_cols = model_cols.drop(["dataset", "direction"])
     rank_df = pd.DataFrame(index=merged["dataset"], columns=model_cols, dtype=float)
     n_models = len(model_cols)
     for _, row in merged.iterrows():
@@ -143,7 +146,7 @@ def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, dat
         model_cols = model + benchmark_model
     # print(merged.columns)
     merged = merged[['dataset', 'direction'] + model_cols]
-    merged[model_cols] = merged[model_cols].abs()
+    merged[model_cols] = merged[model_cols].abs().round(4)
 
     rank_df = calculate_ranks(merged, model_cols)
     avg_rank = rank_df.mean(axis=0).sort_values()
@@ -162,17 +165,17 @@ def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, dat
 
 def main():
     model_list = [
-        'moe-sparse-piecewiselinear', 
+        # 'moe-sparse-piecewiselinear', 
         # 'moe-sparse-shared-piecewiselinear',
         # 'moe-mini-sparse-piecewiselinear',
-        'moe-mini-sparse-shared-piecewiselinear',
-        'tabrm-piecewiselinear', # Retrieval + Shared MLP
+        # 'moe-mini-sparse-shared-piecewiselinear',
+        # 'tabrm-piecewiselinear', # Retrieval + Shared MLP
         'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-        'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
-        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        # 'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+        # 'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
         # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
-        'tabrmv3-mini-periodic',
-        'tabrmoev3-periodic',
+        # 'tabrmv3-mini-periodic',
+        # 'tabrmoev3-periodic',
     ]
     benchmark_model = [
         'MLP',
@@ -194,8 +197,15 @@ def main():
     ]
 
     merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
-    filtered = merged[merged["tabrmv2-periodic"].notna()]
-    filtered.to_csv("output/Temp_123.csv")
+    filtered = merged[merged['tabrmv2-piecewiselinear'].notna()]
+    # filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
     print(filtered)
+    # filtered.to_csv("output/Temp_123.csv")
+    # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
+
+    filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
+    avg_rank = filtered_rank.mean(axis=0).sort_values()
+    print(avg_rank)
+
 if __name__ == "__main__":
     main()

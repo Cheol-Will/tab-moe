@@ -466,8 +466,6 @@ class ModelTabRM(nn.Module):
         #         else 'normal'
         #     )
 
-
-
         print(f"Initiailize backbone as {arch_type}")
         if arch_type == "tabrm":
             self.backbone = lib.deep.TabRM(d_in=d_flat, k=k, **backbone)
