@@ -703,10 +703,12 @@ class MLPBlock(nn.Module):
         d_block: int, 
         dropout: float, 
         activation: str = "ReLU",
+        prenorm: bool = True,
     ):
         super().__init__()
+        
         self.block = nn.Sequential(
-            nn.BatchNorm1d(d_in),
+            nn.BatchNorm1d(d_in) if prenorm else nn.Identity(),
             nn.Linear(d_in, d_block),
             getattr(nn, activation)(),
             nn.Dropout(dropout),
@@ -967,18 +969,26 @@ class TabRMv2(TabRM):
             k=k,
             memory_efficient=memory_efficient,
         )
+
+        def make_block():
+            return nn.Sequential(*[
+                LinearEfficientEnsemble(
+                    in_features=2*d_block,
+                    out_features=2*d_block,
+                    bias=True,
+                    k=k,
+                    ensemble_scaling_in=True,
+                    ensemble_scaling_out=True,
+                    ensemble_bias=True,
+                    scaling_init='ones' # initialize scale parameters (adapter) with 1.
+                ),
+                getattr(nn, activation)(),
+                nn.Dropout(dropout),
+
+            ])
+        
         self.mlp = nn.Sequential(*[
-            LinearEfficientEnsemble(
-                in_features=2*d_block,
-                out_features=2*d_block,
-                bias=True,
-                k=k,
-                ensemble_scaling_in=True,
-                ensemble_scaling_out=True,
-                ensemble_bias=True,
-                scaling_init='ones' # initialize scale parameters (adapter) with 1.
-            )
-            for _ in range(n_blocks)
+            make_block() for _ in range(n_blocks)
         ])
 
 class TabRMv2Mini(TabRM):
@@ -1027,6 +1037,123 @@ class TabRMv2Mini(TabRM):
         ])
 
 
+class ResNet(nn.Module):
+    def __init__(
+        self,
+        d_block: int,
+        n_blocks: int,
+        dropout: float,
+        activation: str = 'ReLU',
+    ):
+        super(ResNet, self).__init__()
+
+        def make_block(prenorm: bool = True):
+            return nn.Sequential(*[
+                nn.LayerNorm(d_block) if prenorm else nn.Identity(),
+                nn.Linear(d_block, d_block),
+                getattr(nn, activation)(),
+                nn.Dropout(dropout),
+                nn.Linear(d_block, d_block)  
+            ])
+        self.blocks = nn.ModuleList(
+            [make_block(True) for _ in range(n_blocks)]
+        )
+
+    def reset_parameters(self):
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                init_rsqrt_uniform_(module.weight, module.in_features)
+                if module.bias is not None:
+                    init_rsqrt_uniform_(module.bias, module.in_features)
+            
+    def forward(self, x):
+        for block in self.blocks:
+            x = x + block(x)
+        return x
+
+class EfficientResNetEnsemble(nn.Module):
+    """
+    Efficient resnet ensemble.
+    Each block consists of: 
+    [BE - ReLU - Dropout - BE] 
+    """
+    def __init__(
+        self,
+        d_block: int,
+        n_blocks: int,
+        dropout: float,
+        k: int,
+        activation: str = 'ReLU',
+    ):
+        super(EfficientResNetEnsemble, self).__init__()
+        def make_block():
+            return nn.Sequential(*[
+                nn.LayerNorm(d_block),
+                LinearEfficientEnsemble(
+                    in_features=d_block, out_features=d_block, bias=True, k=k,
+                    ensemble_scaling_in=True, ensemble_scaling_out=True,
+                    ensemble_bias=True, scaling_init='ones' # initialize scale parameters (adapter) with 1.
+                ),
+                getattr(nn, activation)(),
+                nn.Dropout(dropout),
+                LinearEfficientEnsemble(
+                    in_features=d_block, out_features=d_block, bias=True, k=k,
+                    ensemble_scaling_in=True, ensemble_scaling_out=True,
+                    ensemble_bias=True, scaling_init='ones' # initialize scale parameters (adapter) with 1.
+                ),
+            ])
+        self.blocks = nn.ModuleList(
+            [make_block(True) for _ in range(n_blocks)]
+        )
+    def forward(self, x):
+        """
+        input: (B, K, D)
+        output: (B, K, D)
+        """
+        for block in self.blocks:
+            x = x + block(x)
+        return x
+
+class MiniResNetEnsemble(nn.Module):
+    """
+    Efficient resnet ensemble.
+    Each block consists of: 
+    [LN - BE - ReLU - Dropout - BE] 
+    """
+    def __init__(
+        self,
+        d_block: int,
+        n_blocks: int,
+        dropout: float,
+        k: int,
+        activation: str = 'ReLU',
+    ):
+        super(MiniResNetEnsemble, self).__init__()
+
+        def make_block(prenorm: bool = True, adapter: bool = True):
+            return nn.Sequential(*[
+                nn.LayerNorm(d_block) if prenorm else nn.Identity(),
+                ScaleEnsemble(k, d_block, init='normal') if adapter else nn.Identity(),
+                nn.Linear(d_block, d_block),
+                getattr(nn, activation)(),
+                nn.Dropout(dropout),
+                nn.Linear(d_block, d_block)  
+            ])
+        self.blocks = nn.ModuleList(
+            [make_block(True, i==0) for i in range(n_blocks)]
+        )
+
+    def forward(self, x):
+        """
+        input: (B, K, D)
+        output: (B, K, D)
+        """
+        for block in self.blocks:
+            x = x + block(x)
+        return x
+
+
+
 class TabRMv3(nn.Module):
     """
     Retrieve top-m neighbors and split them into k groups to create k different views of the query.
@@ -1052,6 +1179,7 @@ class TabRMv3(nn.Module):
         num_experts: int = None,
         embed_type: str = "mnca",
         context_shuffle: bool = False,
+        encoder_n_blocks: int = None,
     ) -> None:
         super(TabRMv3, self).__init__()
         d_in = d_block if d_in is None else d_in
@@ -1067,12 +1195,13 @@ class TabRMv3(nn.Module):
             ])
         # >>> E
         # TabR style embedding layer
-        # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> Drop
+        # Note that TabR uses very simple embedding layer and then go to retrieve
+        # Linear
         elif embed_type == "tabr":
+            assert encoder_n_blocks is not None
             self.embed = nn.Sequential(*[
                 nn.Linear(d_in, d_block),
-                MLPBlock(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
-                nn.Dropout(dropout),
+                ResNet(d_block, encoder_n_blocks, dropout, activation)
             ])
         else:
             raise ValueError(f"Unknown embedding type {embed_type} is given.")
@@ -1094,10 +1223,19 @@ class TabRMv3(nn.Module):
         )
 
         # Block takes k different views of query with label context.
-        # need to add ensemble_type == "no" or "basic" or "mlp" or whatever IDK.
-
-        
-        if ensemble_type == "batch":
+        if ensemble_type == "shared-mlp":
+            layers = []
+            for _ in range(n_blocks):
+                layers.append(MLPBlock(d_block, d_block, dropout, activation, prenorm=False))
+                layers.append(nn.Dropout(dropout))
+            self.block = nn.Sequential(*layers)    
+        elif ensemble_type == "shared-resnet":
+            self.block = ResNet(d_block, n_blocks, dropout, activation)
+        elif ensemble_type == "batch-resnet":
+            self.block = EfficientResNetEnsemble(d_block, n_blocks, dropout, k, activation)
+        elif ensemble_type == "mini-resnet":
+            self.block = MiniResNetEnsemble(d_block, n_blocks, dropout, k, activation)
+        elif ensemble_type == "batch":
             # batch-ensemble x N
             # [Adapter - Weight - Adapter] x N
             self.block = nn.Sequential(*[
