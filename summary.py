@@ -172,9 +172,12 @@ def main():
         # 'tabrm-piecewiselinear', # Retrieval + Shared MLP
         'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
         # 'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
-        # 'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
         # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
-        # 'tabrmv3-mini-periodic',
+        # 'tabrmv3-cs-periodic',
+        'tabrmv3-mini-cs-periodic',
+        'tabrmv3-mini-periodic',
+        # 'tabrmv3-shared-cs-periodic'
         # 'tabrmoev3-periodic',
     ]
     benchmark_model = [
