@@ -4,7 +4,7 @@ import math
 
 import delu
 import faiss
-import faiss.contrib.torch_utils  #  
+import faiss.contrib.torch_utils  # << this line makes faiss work with PyTorch
 import rtdl_num_embeddings
 import rtdl_revisiting_models
 import torch
@@ -692,7 +692,7 @@ class MoESparseShared(MoESparse):
         return (x, route) if return_route else x
 
 
-class MLP_Block(nn.Module):
+class MLPBlock(nn.Module):
     """
     ModernNCA style MLP block.
     """
@@ -724,8 +724,6 @@ class MLP_Block(nn.Module):
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(x)
     
-import faiss
-import faiss.contrib.torch_utils  # << this line makes faiss work with PyTorch
 
 class TabRM(nn.Module):
     """
@@ -752,7 +750,7 @@ class TabRM(nn.Module):
         # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> BatchNorm
         self.embed = nn.Sequential(*[
             nn.Linear(d_in, d_block),
-            MLP_Block(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
+            MLPBlock(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
             nn.BatchNorm1d(d_block),
         ])
 
@@ -1052,6 +1050,8 @@ class TabRMv3(nn.Module):
         ensemble_type: str = "batch",
         moe_ratio: float = None,
         num_experts: int = None,
+        embed_type: str = "mnca",
+        context_shuffle: bool = False,
     ) -> None:
         super(TabRMv3, self).__init__()
         d_in = d_block if d_in is None else d_in
@@ -1059,11 +1059,23 @@ class TabRMv3(nn.Module):
         # >>> E
         # ModernNCA style embedding layer
         # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> BatchNorm
-        self.embed = nn.Sequential(*[
-            nn.Linear(d_in, d_block),
-            MLP_Block(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
-            nn.BatchNorm1d(d_block),
-        ])
+        if embed_type == "mnca":
+            self.embed = nn.Sequential(*[
+                nn.Linear(d_in, d_block),
+                MLPBlock(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
+                nn.BatchNorm1d(d_block),
+            ])
+        # >>> E
+        # TabR style embedding layer
+        # Linear -> BatchNorm -> Linear -> ReLU -> Drop -> Linear -> Drop
+        elif embed_type == "tabr":
+            self.embed = nn.Sequential(*[
+                nn.Linear(d_in, d_block),
+                MLPBlock(d_block, d_block, dropout, activation), # no bottleneck or expansion in embedding MLP
+                nn.Dropout(dropout),
+            ])
+        else:
+            raise ValueError(f"Unknown embedding type {embed_type} is given.")
 
         # >>> R
         # TabR Style label encoder and Transformation layer
@@ -1141,6 +1153,7 @@ class TabRMv3(nn.Module):
         self.num_neighbors_per_view = context_size // k
         self.search_index = None
         self.memory_efficient = memory_efficient
+        self.context_shuffle = context_shuffle
         self.reset_parameters()
 
     def reset_parameters(self) -> None:
@@ -1222,6 +1235,11 @@ class TabRMv3(nn.Module):
                 # Not the most elegant solution to remove the argmax, but anyway.
                 context_idx = context_idx.gather(-1, distances.argsort()[:, :-1])
 
+            # shuffle context_idx
+            if self.context_shuffle:
+                shuffle_indicies = torch.randperm(self.context_size)
+                context_idx = context_idx[:, shuffle_indicies]
+
         if self.memory_efficient and torch.is_grad_enabled():
             # the gradient of embedding of context are not being tracked.
             # thus, calculate the embedding once again to track gradient.   
@@ -1245,9 +1263,19 @@ class TabRMv3(nn.Module):
         N = self.num_neighbors_per_view # M // K
         similarities = similarities.reshape(B, K, N) 
         probs = F.softmax(similarities, dim=-1) # (B, K, N)
-        # context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, M, D)
+
+        # what if we mix it?
+        # Currently, we group neighbors in descending order.
+        # So neighbors with close distance to query are grouped and ones far away from query are grouepd together.
+        # so Let's just mix them.
+        # what if we group them in random order?
         context_y_emb = self.label_encoder(candidate_y[context_idx][..., None].to(dtype=torch.float32))
         values = context_y_emb + self.T(x_emb[:, None] - context_x) # (B, M, D)
+
+        # After calculating M values, shuffle them so that 
+        # create shuffle index -> reindex probs and values for shuffle index.
+        # idx = torch.randperm(data_size, device=x_num.device)
+
         values = values.reshape(B, K, N, -1) # (B, K, N, D)
         context_x = torch.einsum("bkn,bknd->bkd", probs, values) # (B, K, D)
 

@@ -209,17 +209,23 @@ def print_tuning_time(model):
     print("Total:", a.sum())
     a.to_csv(f"searching_time_{model}.csv", header=["total_time"])
 
-def merge_and_calulcate_rank(model: str, data_list: list[str], is_save: bool = False) -> pd.DataFrame:
+def merge_and_calulcate_rank(model: str, data_list: list[str], is_save: bool = False, file_name: str = None) -> pd.DataFrame:
     """
     Add our model's metrics to paper metrics table and calculate rank statistics.
     """
 
     paper = pd.read_csv("output/paper_metrics.csv")
-    df = summary_metrics_table([model], data_list, is_print=False, is_save=False)
+    if not isinstance(model, list):
+        model = [model]
+    df = summary_metrics_table(model, data_list, is_print=False, is_save=False)
     model_cols = [c for c in paper.columns if c not in ("dataset", "direction")]
     summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
+
+    print(summary_t)
+    print(paper)
     merged = paper.merge(summary_t, on="dataset", how="left")
-    merged = merged[merged["dataset"].isin(data_list)]
+    if data_list is not None:
+        merged = merged[merged["dataset"].isin(data_list)]
     merged.drop(columns=["TabPFN"], axis=1, inplace=True)
     # merged.dropna(axis=0, inplace=True)
 
@@ -241,11 +247,16 @@ def merge_and_calulcate_rank(model: str, data_list: list[str], is_save: bool = F
 
     avg_rank = rank_df.mean(axis=0)
     avg_rank = avg_rank.sort_values()
-    out_file = f"output/metrics_merged_{model}.csv"
+
+    if file_name is None:
+        from datetime import datetime
+        file_name = datetime.now()
+
+    out_file = f"output/metrics_merged_{file_name}.csv"
     if is_save:
         print(f"\n▶ Saved merged metrics to `{out_file}`")
         merged.to_csv(out_file, index=False, float_format="%.4f")
-        avg_rank.to_csv(f"output/avg_rank_{model}.csv")
+        avg_rank.to_csv(f"output/avg_rank_{file_name}.csv")
     print(merged)
     print(rank_df)
     print(avg_rank)
@@ -256,14 +267,17 @@ def save_ranks_csv(model: list[str], data_list: list[str], file_name: str = None
     """
     Add our model's metrics to paper metrics table and calculate rank statistics.
     """
+    paper = pd.read_csv("output/paper_metrics.csv")
+    if data_list is None:
+        data_list = paper["dataset"]
+    
+    if not isinstance(model, list):
+        model = [model]
+
     if model is not None:
-            
-        paper = pd.read_csv("output/paper_metrics.csv")
         df = summary_metrics_table(model, data_list, is_print=False, is_save=False)
-        
         model_cols = [c for c in paper.columns if c not in ("dataset", "direction")]
         summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
-        
         merged = paper.merge(summary_t, on="dataset", how="left")
         merged = merged[merged["dataset"].isin(data_list)]
         merged.drop(columns=["TabPFN"], axis=1, inplace=True)
@@ -340,8 +354,8 @@ def main():
     ] 
 
     # Report-view of performance table
-    summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=False)
-    summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=print, is_save=False)
+    # summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=True, is_save=False)
+    # summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=True, is_save=False)
     # 
 
     model_list = [
@@ -368,20 +382,33 @@ def main():
         # "microsoft", 
         # "otto",  
     ] 
-    merge_and_calulcate_rank('tabrmv2-mini-periodic', data_list, False)
-    data_list = [
-        "adult", 
-        "black-friday", 
-        "california", 
-        "churn", 
-        # "covtype2", 
-        "diamond", 
-        "higgs-small", 
-        "house", 
-        # "microsoft", 
-        # "otto",  
-    ] 
-    merge_and_calulcate_rank('tabrmv2-periodic', data_list, False)
+    # merge_and_calulcate_rank('tabrmv2-mini-periodic', data_list, False)
+    # data_list = [
+    #     "adult", 
+    #     "black-friday", 
+    #     "california", 
+    #     "churn", 
+    #     # "covtype2", 
+    #     "diamond", 
+    #     "higgs-small", 
+    #     "house", 
+    #     # "microsoft", 
+    #     # "otto",  
+    # ] 
+    model_list = [
+        'moe-sparse-piecewiselinear', 
+        # 'moe-sparse-shared-piecewiselinear',
+        # 'moe-mini-sparse-piecewiselinear',
+        'moe-mini-sparse-shared-piecewiselinear',
+        'tabrm-piecewiselinear', # Retrieval + Shared MLP
+        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+        'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
+        'tabrmv3-mini-periodic',
+        'tabrmoev3-periodic',
+    ]
+    merge_and_calulcate_rank(model=model_list, data_list=None, is_save=False)
     # save_ranks_csv(model=None, data_list=None, file_name="paper_avg_rank")
 
     # save_ranks_csv(model_list, data_list)
