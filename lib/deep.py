@@ -547,6 +547,66 @@ class MultiViewMoEBlock(nn.Module):
         
         return out_flat.view(B, K, D)  #  (B, K, D)
 
+class MoEDropPathBlock(nn.Module):
+    def __init__(
+        self,
+        d_block: int,
+        moe_ratio: float = 0.25,
+        dropout_expert: float = 0.5,  # expert drop rate
+        dropout: float = 0.0,
+        num_experts: int = 32,
+        activation: str = 'ReLU',        
+    ):
+        super(MoEDropPathBlock, self).__init__()
+        d_hidden = int(d_block * moe_ratio)
+
+        self.weights1 = nn.Parameter(torch.empty(num_experts, d_block, d_hidden))
+        self.bias1 = nn.Parameter(torch.empty(num_experts, d_hidden))
+        self.act1 = getattr(nn, activation)()
+        self.dropout1 = nn.Dropout(dropout)
+
+        self.weights2 = nn.Parameter(torch.empty(num_experts, d_hidden, d_block))
+        self.bias2 = nn.Parameter(torch.empty(num_experts, d_block))
+        self.act2 = getattr(nn, activation)()
+        self.dropout2 = nn.Dropout(dropout)
+        
+        self.num_experts = num_experts
+        self.dropout_expert = dropout_expert  
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        init_rsqrt_uniform_(self.weights1, self.weights1.shape[-1])
+        init_rsqrt_uniform_(self.weights2, self.weights2.shape[-1])
+        init_rsqrt_uniform_(self.bias1, self.bias1.shape[-1])
+        init_rsqrt_uniform_(self.bias2, self.bias2.shape[-1])
+        
+
+    def forward(self, x):
+        # x: (B, K, D)
+        B, K, D = x.shape
+        E = self.num_experts
+        x = x.view(-1, D) # (B*K, D)
+        # x = x.unsqueeze(0).expand(E, -1, -1) # (E, B*K, D)
+
+        x = torch.einsum("nd,edh->enh", x, self.weights1) + self.bias1.unsqueeze(1) # (E, N, H)
+        x = self.act1(x)
+        x = self.dropout1(x)
+
+        x = torch.einsum("enh,edh->end", x, self.weights2) + self.bias2.unsqueeze(1) # (E, N, D)
+        x = self.act2(x)
+        x = self.dropout2(x)
+
+        if self.training:
+            mask = (torch.rand(self.num_experts, device=x.device) > self.dropout_expert)
+            mask = mask.float().view(self.num_experts, 1, 1)
+            x = x * mask # (E, N, D)
+            x = x.sum(dim=0)  # (N, D)
+        else:
+            # scale by 1/(1-p) 
+            x = x.sum(dim=0) * (1.0 / (1.0 - self.dropout_expert)) # (N, D)
+
+        return x.view(B, K, D)  # (B, K, D)
+
 
 class MoESparse(nn.Module):
     """
@@ -1180,6 +1240,7 @@ class TabRMv3(nn.Module):
         embed_type: str = "mnca",
         context_shuffle: bool = False,
         encoder_n_blocks: int = None,
+        dropout_expert: float = None,
     ) -> None:
         super(TabRMv3, self).__init__()
         d_in = d_block if d_in is None else d_in
@@ -1275,6 +1336,19 @@ class TabRMv3(nn.Module):
                     dropout=dropout,
                     num_experts=num_experts,
                     activation=activation,
+                )
+                for _ in range(n_blocks)
+            ])
+        elif ensemble_type == "moe-droppath":
+            assert dropout_expert is not None
+            self.block = nn.Sequential(*[
+                MoEDropPathBlock(
+                    d_block=d_block,
+                    moe_ratio=moe_ratio,
+                    dropout_expert=dropout_expert,  # expert drop rate
+                    dropout=dropout,
+                    num_experts=num_experts,
+                    activation=activation,                       
                 )
                 for _ in range(n_blocks)
             ])
