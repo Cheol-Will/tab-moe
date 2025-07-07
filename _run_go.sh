@@ -2,7 +2,7 @@
 # arch_type="moe-mini-sparse-shared"
 # arch_type="tabrm-piecewiselinear"
 # arch_type="tabrmv2-piecewiselinear"
-arch_type="tabrmv3-mini-periodic"
+# arch_type="tabrmoev3-periodic"
 arch_type="tabrmoev3-periodic"
 
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")
@@ -97,5 +97,5 @@ data_list=(
 
 for data in "${data_list[@]}"
 do
-    python bin/go.py exp/${arch_type}/${data}/0-tuning --continue
+    python bin/go.py exp/${arch_type}/${data}/0-tuning --continue | tee exp/${arch_type}/${data}/0-tuning.log 
 done

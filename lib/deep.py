@@ -1082,8 +1082,12 @@ class TabRMv3(nn.Module):
         )
 
         # Block takes k different views of query with label context.
+        # need to add ensemble_type == "no" or "basic" or "mlp" or whatever IDK.
+
+        
         if ensemble_type == "batch":
             # batch-ensemble x N
+            # [Adapter - Weight - Adapter] x N
             self.block = nn.Sequential(*[
             LinearEfficientEnsemble(
                 in_features=d_block,
@@ -1098,7 +1102,7 @@ class TabRMv3(nn.Module):
             for _ in range(n_blocks)                
             ])
         elif ensemble_type == "mini":
-            # Adapter + MLP x N
+            # Adapter - [MLP] x N
             self.block = nn.Sequential(*[
                 ScaleEnsemble(
                     k,
