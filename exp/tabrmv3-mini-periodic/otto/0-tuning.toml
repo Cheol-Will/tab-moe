@@ -22,8 +22,8 @@ type = "AdamW"
 lr = [
     "_tune_",
     "loguniform",
-    0.0001,
-    0.003,
+    3e-05,
+    0.001,
 ]
 weight_decay = [
     "_tune_",
@@ -34,7 +34,6 @@ weight_decay = [
 ]
 
 
-
 [space.model]
 arch_type = "tabrmv3"
 sample_rate = [
@@ -43,16 +42,22 @@ sample_rate = [
     0.05,
     0.6,
 ]
-k = 32
+k = [
+    "_tune_",
+    "int",
+    4,
+    8,
+    4
+]
 
 [space.model.backbone]
 ensemble_type = "mini"
 context_size = [
     "_tune_",
     "int",
-    32,
-    96,
-    32
+    64,
+    256,
+    64
 ]
 n_blocks = [
     "_tune_",
@@ -64,7 +69,7 @@ d_block = [
     "_tune_",
     "int",
     64,
-    768,
+    1024,
     16,
 ]
 dropout = [
