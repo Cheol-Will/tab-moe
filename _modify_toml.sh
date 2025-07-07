@@ -3,11 +3,10 @@ set -euo pipefail
 
 # Check the destination root!!
 # DEST_ROOT="exp/mlp-debug2"
-DEST_ROOT="exp/tabrmv4-mini-cs-periodic"
+DEST_ROOT="exp/tabrmoev4-drop-periodic"
 
 # 1) Define replacement block
 BLOCK=$(cat << 'EOF'
-
 [space.model]
 arch_type = "tabrmv3"
 sample_rate = [
@@ -26,8 +25,8 @@ k = [
 
 [space.model.backbone]
 embed_type = "tabr"
-ensemble_type = "mini-resnet"
-context_shuffle = true
+ensemble_type = "moe-droppath"
+context_shuffle = false
 context_size = [
     "_tune_",
     "int",
@@ -41,6 +40,20 @@ encoder_n_blocks = [
     0, 
     1
 ]
+num_experts = [
+    "_tune_",
+    "int",
+    4, 
+    8,
+    4
+]
+moe_ratio = [
+    "_tune_",
+    "float",
+    0.25,
+    1.0,
+    0.25
+]
 n_blocks = [
     "_tune_",
     "int",
@@ -53,6 +66,13 @@ d_block = [
     64,
     1024,
     16,
+]
+dropout_expert = [
+    "_tune_",
+    "?uniform",
+    0.0,
+    0.0,
+    0.5,
 ]
 dropout = [
     "_tune_",
@@ -85,6 +105,7 @@ frequency_init_scale = [
     10.0,
 ]
 lite = false
+
 EOF
 )
 

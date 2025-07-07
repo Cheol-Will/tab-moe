@@ -1,0 +1,41 @@
+seed = 8
+batch_size = 256
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/churn"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
+
+[optimizer]
+type = "AdamW"
+lr = 3.8062137596534755e-05
+weight_decay = 0.0
+
+[model]
+arch_type = "tabrmv3"
+sample_rate = 0.42995721151708016
+k = 4
+
+[model.backbone]
+embed_type = "tabr"
+ensemble_type = "moe"
+context_shuffle = false
+context_size = 256
+encoder_n_blocks = 0
+num_experts = 8
+moe_ratio = 1.0
+n_blocks = 1
+d_block = 992
+dropout = 0.0
+
+[model.num_embeddings]
+type = "PeriodicEmbeddings"
+n_frequencies = 64
+d_embedding = 20
+frequency_init_scale = 0.15339539344177444
+lite = false

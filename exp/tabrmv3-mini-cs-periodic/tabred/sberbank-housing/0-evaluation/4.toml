@@ -1,0 +1,39 @@
+seed = 4
+batch_size = 256
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/sberbank-housing"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
+
+[optimizer]
+type = "AdamW"
+lr = 0.00027654705031556967
+weight_decay = 0.0017468514170546256
+
+[model]
+arch_type = "tabrmv3"
+sample_rate = 0.37127379116638076
+k = 4
+
+[model.backbone]
+ensemble_type = "mini"
+context_shuffle = true
+context_size = 64
+num_experts = 8
+moe_ratio = 0.75
+n_blocks = 2
+d_block = 704
+dropout = 0.0
+
+[model.num_embeddings]
+type = "PeriodicEmbeddings"
+n_frequencies = 92
+d_embedding = 28
+frequency_init_scale = 3.8884131161479414
+lite = false
