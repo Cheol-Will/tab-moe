@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 11,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 3.03137955498814e-05,
+            "weight_decay": 0.044361224949735344
+        },
+        "model": {
+            "arch_type": "tabrmv3",
+            "sample_rate": 0.47909985495762053,
+            "k": 4,
+            "backbone": {
+                "ensemble_type": "mini",
+                "context_size": 64,
+                "n_blocks": 1,
+                "d_block": 544,
+                "dropout": 0.0020779615874243606
+            },
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 96,
+                "d_embedding": 28,
+                "frequency_init_scale": 0.017059077007511598,
+                "lite": false
+            }
+        }
+    },
+    "n_parameters": 9163280,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 3700,
+    "metrics": {
+        "train": {
+            "rmse": 0.2669766201791362,
+            "mae": 0.13861660659313202,
+            "r2": 0.5446342947361364,
+            "score": -0.2669766201791362
+        },
+        "val": {
+            "rmse": 0.249050625083639,
+            "mae": 0.14610247313976288,
+            "r2": 0.5856889156748399,
+            "score": -0.249050625083639
+        },
+        "test": {
+            "rmse": 0.2460743578581845,
+            "mae": 0.15450261533260345,
+            "r2": 0.5862173330376144,
+            "score": -0.2460743578581845
+        }
+    },
+    "time": "0:14:12.671209",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        0,
+        3
+    ],
+    "head_selection_time": "0:00:00.009636"
+}

@@ -19,9 +19,8 @@
             "amp": true,
             "data": {
                 "cache": true,
-                "path": "data/sberbank-housing",
-                "num_policy": "noisy-quantile",
-                "cat_policy": "ordinal"
+                "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+                "num_policy": "noisy-quantile"
             },
             "optimizer": {
                 "type": "AdamW",
@@ -55,13 +54,27 @@
                     4
                 ],
                 "backbone": {
-                    "ensemble_type": "mini",
+                    "ensemble_type": "moe",
                     "context_size": [
                         "_tune_",
                         "int",
                         64,
                         256,
                         64
+                    ],
+                    "num_experts": [
+                        "_tune_",
+                        "int",
+                        4,
+                        16,
+                        4
+                    ],
+                    "moe_ratio": [
+                        "_tune_",
+                        "float",
+                        0.25,
+                        1.0,
+                        0.25
                     ],
                     "n_blocks": [
                         "_tune_",
@@ -125,65 +138,66 @@
             "amp": true,
             "data": {
                 "cache": true,
-                "path": "data/sberbank-housing",
-                "num_policy": "noisy-quantile",
-                "cat_policy": "ordinal"
+                "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+                "num_policy": "noisy-quantile"
             },
             "optimizer": {
                 "type": "AdamW",
-                "lr": 3.03137955498814e-05,
-                "weight_decay": 0.044361224949735344
+                "lr": 3.0655691332840655e-05,
+                "weight_decay": 0.005757171341849576
             },
             "model": {
                 "arch_type": "tabrmv3",
-                "sample_rate": 0.47909985495762053,
+                "sample_rate": 0.4219875800060431,
                 "k": 4,
                 "backbone": {
-                    "ensemble_type": "mini",
-                    "context_size": 64,
-                    "n_blocks": 1,
-                    "d_block": 544,
-                    "dropout": 0.0020779615874243606
+                    "ensemble_type": "moe",
+                    "context_size": 192,
+                    "num_experts": 12,
+                    "moe_ratio": 0.5,
+                    "n_blocks": 2,
+                    "d_block": 576,
+                    "dropout": 0.0
                 },
                 "num_embeddings": {
                     "type": "PeriodicEmbeddings",
-                    "n_frequencies": 96,
-                    "d_embedding": 28,
-                    "frequency_init_scale": 0.017059077007511598,
+                    "n_frequencies": 72,
+                    "d_embedding": 16,
+                    "frequency_init_scale": 0.0327896647518244,
                     "lite": false
                 }
             }
         },
-        "n_parameters": 9163280,
+        "n_parameters": 9870868,
         "prediction_type": "labels",
-        "epoch_size": 74,
-        "best_step": 1554,
+        "epoch_size": 40,
+        "best_step": 480,
         "metrics": {
             "train": {
-                "rmse": 0.26895182981884524,
-                "mae": 0.14681510627269745,
-                "r2": 0.5378713909119941,
-                "score": -0.26895182981884524
+                "rmse": 0.8343461835364149,
+                "mae": 0.6176480054855347,
+                "r2": 0.19592702603905587,
+                "score": -0.8343461835364149
             },
             "val": {
-                "rmse": 0.2473569270544109,
-                "mae": 0.13959906995296478,
-                "r2": 0.5913048981666584,
-                "score": -0.2473569270544109
+                "rmse": 0.8630210173535117,
+                "mae": 0.6429628133773804,
+                "r2": 0.11669957795922381,
+                "score": -0.8630210173535117
             },
             "test": {
-                "rmse": 0.24856412827378324,
-                "mae": 0.14908155798912048,
-                "r2": 0.5778017085155027,
-                "score": -0.24856412827378324
+                "rmse": 0.8808366387725374,
+                "mae": 0.6510252356529236,
+                "r2": 0.11082463970654399,
+                "score": -0.8808366387725374
             }
         },
-        "time": "0:07:55.036098",
+        "time": "0:03:14.016243",
         "chunk_size": null,
-        "eval_batch_size": 32768,
-        "trial_id": 99,
-        "tuning_time": "13:22:48.262943"
+        "eval_batch_size": 8192,
+        "trial_id": 39,
+        "tuning_time": "1:34:38.237093"
     },
-    "time": "13:22:48.794571",
-    "n_completed_trials": 100
+    "time": "1:51:48.137822",
+    "n_completed_trials": 46
 }
