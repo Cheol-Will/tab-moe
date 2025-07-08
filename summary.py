@@ -175,10 +175,16 @@ def main():
         'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
         # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
         # 'tabrmv3-cs-periodic',
-        'tabrmv3-mini-cs-periodic',
-        'tabrmv3-mini-periodic',
+        # 'tabrmv3-mini-cs-periodic',
         # 'tabrmv3-shared-cs-periodic'
         # 'tabrmoev3-periodic',
+        # current -------------------------
+        'tabrmv3-mini-periodic',        
+        'tabrmoev3-periodic',
+        'tabrmv4-mini-periodic',        
+        'tabrmv4-shared-periodic',
+        'tabrmoev4-periodic',
+        # 'tabrmv4-moe-periodic',
     ]
     benchmark_model = [
         'MLP',
@@ -200,15 +206,33 @@ def main():
     ]
 
     merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
-    filtered = merged[merged['tabrmv2-piecewiselinear'].notna()]
-    # filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
-    print(filtered)
+    # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
+    
+    target_model_list = [
+        'tabrmv3-mini-periodic',        
+        'tabrmoev3-periodic',
+        'tabrmv4-mini-periodic',        
+        'tabrmv4-shared-periodic',
+        'tabrmoev4-periodic'
+    ]    
+    for target_model in target_model_list:
+
+    # filter_model = 'tabrmv4-shared-periodic'
+        filtered = merged[merged[target_model].notna()]
+        filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
+        avg_rank = filtered_rank.mean(axis=0).sort_values()
+        print(target_model)
+        print(filtered)
+        print(avg_rank)
+        print()
+
+    # filtered = merged[merged['tabrmoev3-periodic'].notna()]
+    
+    #
+    #  filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
     # filtered.to_csv("output/Temp_123.csv")
     # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
 
-    filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
-    avg_rank = filtered_rank.mean(axis=0).sort_values()
-    print(avg_rank)
 
 if __name__ == "__main__":
     main()
