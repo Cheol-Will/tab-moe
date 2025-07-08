@@ -151,7 +151,6 @@ def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, dat
     avg_rank = rank_df.mean(axis=0).sort_values()
 
     if is_save:
-        file_name = file_name or datetime.now().strftime("%Y%m%d_%H%M%S")
         merged.to_csv(f"output/metrics_merged_{file_name}.csv", index=False, float_format="%.4f")
         avg_rank.to_csv(f"output/avg_rank_{file_name}.csv")
         print(f"\nSaved merged metrics to output/metrics_merged_{file_name}.csv")
@@ -232,6 +231,16 @@ def main():
         print()
     merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=None, data_list=None, is_save=False, is_print=False)
     print(merged)
+    filtered = merged[merged["tabrmv4-shared-periodic"].notna()]
+    filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
+    avg_rank = filtered_rank.mean(axis=0).sort_values()
+    filtered = filtered.T
+    print(filtered)
+    print(avg_rank)
+    file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    filtered.to_csv(f"output/metrics_{file_name}.csv")
+    avg_rank.to_csv(f"output/ranks_{file_name}.csv")
+
     # filtered = merged[merged['tabrmoev3-periodic'].notna()]
     
     #
