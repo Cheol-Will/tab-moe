@@ -592,7 +592,7 @@ class MoEDropPathBlock(nn.Module):
         x = self.act1(x)
         x = self.dropout1(x)
 
-        x = torch.einsum("enh,edh->end", x, self.weights2) + self.bias2.unsqueeze(1) # (E, N, D)
+        x = torch.einsum("enh,ehd->end", x, self.weights2) + self.bias2.unsqueeze(1) # (E, N, D)
         x = self.act2(x)
         x = self.dropout2(x)
 
