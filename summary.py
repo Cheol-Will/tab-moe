@@ -132,7 +132,6 @@ def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, dat
     model = [model] if isinstance(model, str) else model
     df = summary_metrics_table(model, data_list)
     summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
-
     merged = paper.merge(summary_t, on="dataset", how="left")
     if data_list is not None:
         merged = merged[merged["dataset"].isin(data_list)]
@@ -205,19 +204,25 @@ def main():
         'TabMmini-piecewiselinear',
     ]
 
-    merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
+    # merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
     # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
     
     target_model_list = [
+        'moe-sparse-piecewiselinear', 
+        'moe-mini-sparse-shared-piecewiselinear',
+        'tabrmv2-piecewiselinear',        
         'tabrmv3-mini-periodic',        
         'tabrmoev3-periodic',
         'tabrmv4-mini-periodic',        
         'tabrmv4-shared-periodic',
-        'tabrmoev4-periodic'
+        'tabrmoev4-periodic',
+        'tabrmoev4-drop-periodic'
     ]    
     for target_model in target_model_list:
-
+        continue
     # filter_model = 'tabrmv4-shared-periodic'
+        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=None, data_list=None, is_save=False, is_print=False)
+        # print(merged)
         filtered = merged[merged[target_model].notna()]
         filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
         avg_rank = filtered_rank.mean(axis=0).sort_values()
@@ -225,7 +230,8 @@ def main():
         print(filtered)
         print(avg_rank)
         print()
-
+    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=None, data_list=None, is_save=False, is_print=False)
+    print(merged)
     # filtered = merged[merged['tabrmoev3-periodic'].notna()]
     
     #
