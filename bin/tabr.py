@@ -252,8 +252,8 @@ class Model(nn.Module):
             assert is_train
             # Repeat the same computation for the context objects and with autograd on.
             # concat -> indexing -> encode
-            candidate_num = torch.cat[x_num, candidate_x_num]
-            candidate_cat = torch.cat[x_cat, candidate_x_cat]
+            candidate_num = torch.cat([x_num, candidate_x_num])
+            candidate_cat = torch.cat([x_cat, candidate_x_cat])
             context_k = self._encode(
                 candidate_num[context_idx], candidate_cat[context_idx]
             )[1].reshape(batch_size, context_size, -1)
@@ -285,3 +285,11 @@ class Model(nn.Module):
         # print(f"[Debug] x: {x.shape}")
 
         return x
+
+# def main(
+#     config: Config | str | Path,
+#     output: None | str | Path = None,
+#     *,
+#     force: bool = False,
+# ) -> None | lib.JSONDict:
+    
