@@ -56,7 +56,7 @@ class Model(nn.Module):
         normalization: str, # BatchNorm or LayerNorm
         activation: str,
         context_size: int = 96, # always same
-        # Below uptions are used only if it's needed.
+        # Below options are used only if it's needed.
         memory_efficient: bool = False,
         candidate_encoding_batch_size: None | int = None,
         # k: str | int = None, # dummy parameter
