@@ -4,7 +4,7 @@ set -euo pipefail
 # Check the destination root!!
 # DEST_ROOT="exp/mlp-debug2"
 # DEST_ROOT="exp/tabrmoev4-drop-periodic"
-DEST_ROOT="exp/reproduced-tabr-periodic"
+DEST_ROOT="exp/tabr-pln-periodic"
 
 
 # delete the line with graident_clipping_norm 
@@ -31,10 +31,9 @@ weight_decay = [
 ]
 
 [space.model]
-arch_type = "tabr"
-k = 1
+arch_type = "tabr-pln"
+k = 32
 context_size = 96
-share_training_batches = false
 d_main = [
     "_tune_",
     "int",

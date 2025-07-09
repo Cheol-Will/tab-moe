@@ -806,8 +806,9 @@ def main(
         is_train is needed to avoid TabRM excluding every train data during evlauating on trainset.  
         """
         is_train = (part == 'train')
+        
 
-        if config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini',]:
+        if arch_type in ['tabrm', 'tabrmv2', 'tabrmv2-mini',]:
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
             x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
 
@@ -827,7 +828,7 @@ def main(
             )
 
             return model(x_num, x_cat, candidate_x_num, candidate_x_cat, is_train).squeeze(-1).float()        
-        elif config['model']['arch_type'] in ['tabrmv3']:
+        elif arch_type in ['tabrmv3']:
             # Note that tabrmv3 requires candidate_y.
             # For train data, it takes both y and candidate_y as inputs.
             x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
@@ -855,7 +856,7 @@ def main(
 
             return model(x_num, x_cat, candidate_x_num, candidate_x_cat, y, candidate_y, is_train).squeeze(-1).float()        
         
-        elif config['model']['arch_type'] in ['tabr']:
+        elif arch_type in ['tabr', 'tabr-pln']:
             candidate_indices = train_indices
             is_train = part == 'train'
             y_train = Y_train.to(
@@ -878,7 +879,7 @@ def main(
                 if ('x_cat' in dataset.data) else None
             )
             candidate_y = y_train[candidate_indices]
-            return model(
+            pred = model(
                 x_num=x_num,
                 x_cat=x_cat,
                 y=y,
@@ -887,7 +888,8 @@ def main(
                 candidate_y=candidate_y,
                 is_train=is_train,
             ).squeeze(-1).float()
-
+            pred = pred.squeeze(-1).float()
+            return pred
         else:
             return (
                 model(
