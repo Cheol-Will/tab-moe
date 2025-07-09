@@ -1,0 +1,35 @@
+seed = 9
+batch_size = 256
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/adult"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
+
+[optimizer]
+type = "AdamW"
+lr = 0.0017863752378139426
+weight_decay = 0.00036283198239000586
+
+[model]
+arch_type = "tabm-mini"
+k = 32
+share_training_batches = false
+
+[model.backbone]
+type = "MLP"
+n_blocks = 3
+d_block = 752
+dropout = 0.3667708294272814
+
+[model.num_embeddings]
+type = "PiecewiseLinearEmbeddingsV2"
+d_embedding = 32
+
+[bins]
+n_bins = 109

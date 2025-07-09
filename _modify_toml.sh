@@ -3,84 +3,75 @@ set -euo pipefail
 
 # Check the destination root!!
 # DEST_ROOT="exp/mlp-debug2"
-DEST_ROOT="exp/tabrmoev4-drop-periodic"
+# DEST_ROOT="exp/tabrmoev4-drop-periodic"
+DEST_ROOT="exp/reproduced-tabr-periodic"
+
+
+# delete the line with graident_clipping_norm 
+find "${DEST_ROOT}" -type f -name "0-tuning.toml" -exec sed -i '/^gradient_clipping_norm/d' {} +
+
+
 
 # 1) Define replacement block
 BLOCK=$(cat << 'EOF'
-[space.model]
-arch_type = "tabrmv3"
-sample_rate = [
+[space.optimizer]
+type = "AdamW"
+lr = [
     "_tune_",
-    "uniform",
-    0.05,
-    0.6,
+    "loguniform",
+    3e-05,
+    0.001,
 ]
-k = [
+weight_decay = [
     "_tune_",
-    "int",
-    4,
-    8,
-    4
+    "?loguniform",
+    0.0,
+    1e-06,
+    0.0001,
 ]
 
-[space.model.backbone]
-embed_type = "tabr"
-ensemble_type = "moe-droppath"
-context_shuffle = false
-context_size = [
+[space.model]
+arch_type = "tabr"
+k = 1
+context_size = 96
+share_training_batches = false
+d_main = [
     "_tune_",
     "int",
-    64,
-    256,
-    64
+    96,
+    384,
 ]
+context_dropout = [
+    "_tune_",
+    "?uniform",
+    0.0,
+    0.0,
+    0.6,
+]
+d_multiplier = 2.0
 encoder_n_blocks = [
     "_tune_",
     "int",
-    0, 
-    1
+    0,
+    1,
 ]
-num_experts = [
-    "_tune_",
-    "int",
-    4, 
-    8,
-    4
-]
-moe_ratio = [
-    "_tune_",
-    "float",
-    0.25,
-    1.0,
-    0.25
-]
-n_blocks = [
+predictor_n_blocks = [
     "_tune_",
     "int",
     1,
     2,
 ]
-d_block = [
-    "_tune_",
-    "int",
-    64,
-    1024,
-    16,
-]
-dropout_expert = [
+mixer_normalization = "auto"
+dropout0 = [
     "_tune_",
     "?uniform",
     0.0,
     0.0,
-    0.5,
+    0.6,
 ]
-dropout = [
-    "_tune_",
-    "?uniform",
-    0.0,
-    0.0,
-    0.5,
-]
+dropout1 = 0.0
+normalization = "LayerNorm"
+activation = "ReLU"
 
 [space.model.num_embeddings]
 type = "PeriodicEmbeddings"
@@ -89,23 +80,20 @@ n_frequencies = [
     "int",
     16,
     96,
-    4,
-]
-d_embedding = [
-    "_tune_",
-    "int",
-    16,
-    32,
-    4,
 ]
 frequency_init_scale = [
     "_tune_",
     "loguniform",
     0.01,
-    10.0,
+    100.0,
 ]
-lite = false
-
+d_embedding = [
+    "_tune_",
+    "int",
+    16,
+    64,
+]
+lite = true
 EOF
 )
 
@@ -127,7 +115,8 @@ for file in "${files[@]}"; do
   tmp="${file}.tmp"
 
   # keep everything up to (but not including) [space.model]
-  sed '/^\[space\.model\]/,$d' "$file" > "$tmp"
+#   sed '/^\[space\.model\]/,$d' "$file" > "$tmp"
+  sed '/^\[space\.optimizer\]/,$d' "$file" > "$tmp"
   # append the replacement block
   printf '%s\n' "$BLOCK" >> "$tmp"
   # overwrite original

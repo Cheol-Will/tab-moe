@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 11,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-pol",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00034155193386488706,
+            "weight_decay": 0.00011001201626147528
+        },
+        "model": {
+            "arch_type": "tabm-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 416,
+                "dropout": 0.22689898419466498
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 56
+        }
+    },
+    "n_parameters": 465536,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 7280,
+    "metrics": {
+        "train": {
+            "rmse": 1.5065416900457236,
+            "mae": 0.6650814414024353,
+            "r2": 0.998685384751969,
+            "score": -1.5065416900457236
+        },
+        "val": {
+            "rmse": 2.189123695492948,
+            "mae": 0.9432756900787354,
+            "r2": 0.9973323146271998,
+            "score": -2.189123695492948
+        },
+        "test": {
+            "rmse": 2.340619145018075,
+            "mae": 1.000626564025879,
+            "r2": 0.9968805189762974,
+            "score": -2.340619145018075
+        }
+    },
+    "time": "0:01:35.451937",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        19,
+        2,
+        29,
+        26
+    ],
+    "head_selection_time": "0:00:00.130186"
+}

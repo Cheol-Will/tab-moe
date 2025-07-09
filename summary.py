@@ -184,6 +184,23 @@ def main():
         'tabrmoev4-periodic',
         # 'tabrmv4-moe-periodic',
     ]
+    bench = [
+        'MLP',
+        'Excel-plugins',
+        'SAINT',
+        'FT-T',
+        'T2G',
+        'MNCA',
+        'TabR',
+        'MLP-piecewiselinear',
+        'LightGBM',
+        'XGBoost',
+        'CatBoost',
+        'MNCA-periodic',
+        'TabR-periodic',
+        'TabM',
+        'TabMmini-piecewiselinear',
+    ]
     benchmark_model = [
         'MLP',
         'ResNet',
@@ -207,39 +224,52 @@ def main():
     # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
     
     target_model_list = [
-        'moe-sparse-piecewiselinear', 
-        'moe-mini-sparse-shared-piecewiselinear',
+        # 'moe-sparse-piecewiselinear', 
+        # 'moe-mini-sparse-shared-piecewiselinear',
         'tabrmv2-piecewiselinear',        
-        'tabrmv3-mini-periodic',        
-        'tabrmoev3-periodic',
+        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        # 'tabrmv3-mini-periodic',        
+        # 'tabrmoev3-periodic',
         'tabrmv4-mini-periodic',        
         'tabrmv4-shared-periodic',
         'tabrmoev4-periodic',
         'tabrmoev4-drop-periodic'
     ]    
+
+    # target_model_list = [
+    #     'tabrm-piecewiselinear', # Retrieval + Shared MLP
+    #     'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+    #     'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+    #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+    #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini        
+    # ]
     for target_model in target_model_list:
-        continue
     # filter_model = 'tabrmv4-shared-periodic'
-        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=None, data_list=None, is_save=False, is_print=False)
+        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
         # print(merged)
         filtered = merged[merged[target_model].notna()]
         filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
-        avg_rank = filtered_rank.mean(axis=0).sort_values()
+        avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
+        avg_rank.to_csv(f"output/rank_for_ppt_{target_model}.csv")
         print(target_model)
         print(filtered)
         print(avg_rank)
         print()
-    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=None, data_list=None, is_save=False, is_print=False)
+
+    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
     print(merged)
-    filtered = merged[merged["tabrmv4-shared-periodic"].notna()]
+    filtered = merged[merged["tabrmv4-mini-periodic"].notna()]
+    
     filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
-    avg_rank = filtered_rank.mean(axis=0).sort_values()
+    avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
     filtered = filtered.T
+    
     print(filtered)
     print(avg_rank)
-    file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    filtered.to_csv(f"output/metrics_{file_name}.csv")
-    avg_rank.to_csv(f"output/ranks_{file_name}.csv")
+    # file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # file_name = "for_ppt_250708_1541"
+    # filtered.to_csv(f"output/metrics_{file_name}.csv")
+    # avg_rank.to_csv(f"output/ranks_{file_name}.csv")
 
     # filtered = merged[merged['tabrmoev3-periodic'].notna()]
     

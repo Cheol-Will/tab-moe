@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 4,
+        "batch_size": 512,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-medical_charges",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00018351006427916303,
+            "weight_decay": 0.029537600750468254
+        },
+        "model": {
+            "arch_type": "tabm-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 96,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 12
+            }
+        },
+        "bins": {
+            "n_bins": 69
+        }
+    },
+    "n_parameters": 38264,
+    "prediction_type": "labels",
+    "epoch_size": 20,
+    "best_step": 6220,
+    "metrics": {
+        "train": {
+            "rmse": 0.07893755770879012,
+            "mae": 0.05106443539261818,
+            "r2": 0.9801053214049726,
+            "score": -0.07893755770879012
+        },
+        "val": {
+            "rmse": 0.0821735901221088,
+            "mae": 0.051829706877470016,
+            "r2": 0.9789705297413616,
+            "score": -0.0821735901221088
+        },
+        "test": {
+            "rmse": 0.08154443065680561,
+            "mae": 0.05156036466360092,
+            "r2": 0.9793409792988672,
+            "score": -0.08154443065680561
+        }
+    },
+    "time": "0:01:09.433477",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        16,
+        25,
+        12,
+        5
+    ],
+    "head_selection_time": "0:00:00.373142"
+}

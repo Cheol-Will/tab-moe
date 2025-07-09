@@ -1,0 +1,78 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 8,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0018435138682340293,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "tabm-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 2,
+                "d_block": 720,
+                "dropout": 0.1957007219427008
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 89
+        }
+    },
+    "n_parameters": 10524112,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 296,
+    "metrics": {
+        "train": {
+            "rmse": 0.23648606689472973,
+            "mae": 0.11813672631978989,
+            "r2": 0.6427066108342674,
+            "score": -0.23648606689472973
+        },
+        "val": {
+            "rmse": 0.235058201978521,
+            "mae": 0.12762358784675598,
+            "r2": 0.6309356759651221,
+            "score": -0.235058201978521
+        },
+        "test": {
+            "rmse": 0.2338392890510794,
+            "mae": 0.14727185666561127,
+            "r2": 0.6263417748000601,
+            "score": -0.2338392890510794
+        }
+    },
+    "time": "0:01:00.945046",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        19,
+        21,
+        12,
+        27,
+        15
+    ],
+    "head_selection_time": "0:00:00.172280"
+}
