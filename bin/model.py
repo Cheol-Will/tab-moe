@@ -650,24 +650,6 @@ def main(
         torch.long if dataset.task.is_classification else torch.float
     )
 
-
-    def get_Xy(part: str, idx) -> tuple[dict[str, Tensor], Tensor]:
-        batch = (
-            {
-                key[2:]: dataset.data[key][part]
-                for key in dataset.data
-                if key.startswith('x_') # modify to x_
-                # if key.startswith('X_')
-            },
-            dataset.data['y'][part],
-        )
-        return (
-            batch
-            if idx is None
-            else ({k: v[idx] for k, v in batch[0].items()}, batch[1][idx])
-        )
-
-
     # >>> Model
     if 'bins' in config:
         # Compute the bins for PiecewiseLinearEncoding and PiecewiseLinearEmbeddings.
@@ -690,58 +672,52 @@ def main(
         bin_edges = None
 
     # branching for custom model
-    if config['model']['arch_type'] in ['moe-sparse', 'moe-sparse-shared']:
+    arch_type = config['model']['arch_type'] 
+    meta_data = {
+        "n_num_features": dataset.n_num_features,
+        "cat_cardinalities": dataset.compute_cat_cardinalities(),
+        "n_classes": dataset.task.try_compute_n_classes(),
+        "bins": bin_edges,
+    }
+    if arch_type in ['moe-sparse', 'moe-sparse-shared']:
         # print("Debug", "=" * 50)
-        print(f"Init Model MoE with {config['model']['arch_type']}" )
+        print(f"Init Model MoE with {arch_type}" )
         print(f"Init Model MoE with {config['model']}" )
         model = ModelMoE(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,            
         )
-    elif config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
+    elif arch_type in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
         # print("Debug", "=" * 50)
-        print(f"Init with {config['model']['arch_type']}" )
+        print(f"Init with {arch_type}" )
         print(f"Init with {config['model']}" )
         model = ModelTabRM(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,            
         )
-    elif config['model']['arch_type'] in ['tabr']:
-   
+    elif arch_type in ['tabr', 'tabr-pln']:
         model_args = config['model'].copy()
         model_args.pop('arch_type', None)
-        model_args.pop('k', None)
         model_args.pop('share_training_batches', None)
-
-        print(f"Init with {config['model']['arch_type']}" )
+        print(f"Init with {arch_type}" )
         print(f"Init with {model_args}" )
-        # print("[Debug]")
-        # print(f"init with{dataset.n_num_features}")
-        # print(f"init with{dataset.compute_cat_cardinalities()}")
-        # print(f"init with{dataset.task.try_compute_n_classes()}")
-
-        import tabr
-        model = tabr.Model(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
-            # **config['model'],
-            **model_args,
-            bins=bin_edges,            
-        )
+        if arch_type == 'tabr':
+            import tabr
+            model_args.pop('k', None)
+            model = tabr.Model(
+                **meta_data,
+                **model_args,
+            )
+        elif arch_type == 'tabr-pln':
+            import tabr_pln
+            model = tabr_pln.Model(
+                **meta_data,
+                **model_args,
+            )
     else:
         model = Model(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,
         )
     report['n_parameters'] = lib.deep.get_n_parameters(model)
     logger.info(f'n_parameters = {report["n_parameters"]}')

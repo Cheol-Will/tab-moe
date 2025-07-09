@@ -1,4 +1,5 @@
 import math
+import numbers
 import shutil
 import statistics
 import sys
@@ -13,10 +14,10 @@ import rtdl_num_embeddings
 import scipy
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+from torch.nn import functional as F, init
 import torch.utils.tensorboard
 from loguru import logger
-from torch import Tensor
+from torch import Size, Tensor
 from tqdm import tqdm
 from typing_extensions import NotRequired, TypedDict
 
@@ -34,6 +35,63 @@ import lib.deep
 import lib.env
 from lib import KWArgs, PartKey
 
+class ParallelLayerNorm(nn.Module):
+    """
+    Apply k parallel layer normalizaion layers.
+
+    """
+
+    def __init__(
+        self,
+        hidden_dim: int,
+        k: int = 4, 
+        eps: float = 1e-5,
+        bias: bool = True,
+        device=None,
+        dtype=None,
+    ) -> None:
+        """
+        hidden_dim: hidden dimension
+        k: the number of parallel layer norms
+        """
+        
+        factory_kwargs = {"device": device, "dtype": dtype}
+        super().__init__()
+        self.hidden_dim = hidden_dim
+        self.k = k
+        self.eps = eps
+
+        self.weight = nn.Parameter(
+            torch.empty((k, hidden_dim), **factory_kwargs)
+        )
+        if bias:
+            self.bias = nn.Parameter(
+                torch.empty((k, hidden_dim), **factory_kwargs)
+            )
+        else:
+            self.register_parameter("bias", None)
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        nn.init.normal_(self.weight, mean=1.0, std=1/self.hidden_dim**(0.5))
+        if self.bias is not None:
+            nn.init.normal_(self.bias, mean=0, std=1/self.hidden_dim**(0.5))
+
+    def forward(self, x: Tensor) -> Tensor:
+        """
+        input: (B, K, D)
+        output: (B, K, D)
+        """
+        assert x.ndim == 3
+        mu = x.mean(dim=-1, keepdim=True)
+        var = x.var(dim=-1, unbiased=False, keepdim=True)
+        x = (x - mu) / torch.sqrt(var + self.eps)
+        
+        x = x * self.weight.unsqueeze(0) 
+        if self.bias is not None:
+            x = x + self.bias.unsqueeze(0)
+        return x
+
 
 class Model(nn.Module):
     def __init__(
@@ -44,6 +102,7 @@ class Model(nn.Module):
         n_classes: None | int,
         bins: None | list[Tensor],
         #
+        k: None | int = None,
         num_embeddings: None | dict = None,
         d_main: int,
         d_multiplier: float,
@@ -56,11 +115,11 @@ class Model(nn.Module):
         normalization: str, # BatchNorm or LayerNorm
         activation: str,
         context_size: int = 96, # always same
-        # Below uptions are used only if it's needed.
+        # Below options are used only if it's needed.
         memory_efficient: bool = False,
         candidate_encoding_batch_size: None | int = None,
-        # k: str | int = None, # dummy parameter
     ):
+        assert k is not None
         if not memory_efficient:
             assert candidate_encoding_batch_size is None
         if mixer_normalization == 'auto':
@@ -105,7 +164,7 @@ class Model(nn.Module):
         Normalization = getattr(nn, normalization)
         Activation = getattr(nn, activation)
 
-        def make_block(prenorm: bool) -> nn.Sequential:
+        def make_encoder_block(prenorm: bool) -> nn.Sequential:
             return nn.Sequential(
                 *([Normalization(d_main)] if prenorm else []),
                 nn.Linear(d_main, d_block),
@@ -114,9 +173,21 @@ class Model(nn.Module):
                 nn.Linear(d_block, d_main),
                 nn.Dropout(dropout1),
             )
+
+        def make_predictor_block() -> nn.Sequential:
+            return nn.Sequential(
+                ParallelLayerNorm(hidden_dim=d_main, k=k), # k parallel layer norms
+                nn.Linear(d_main, d_block),
+                Activation(),
+                nn.Dropout(dropout0),
+                nn.Linear(d_block, d_main),
+                nn.Dropout(dropout1),
+            )
+
+
         self.linear = nn.Linear(d_in, d_main) # first layer
         self.blocks0 = nn.ModuleList(
-            [make_block(i > 0) for i in range(encoder_n_blocks)] # First embedding has no LayerNorm. 
+            [make_encoder_block(i > 0) for i in range(encoder_n_blocks)] # First embedding has no LayerNorm. 
         )
         
         # >>> Retreival
@@ -141,7 +212,7 @@ class Model(nn.Module):
         # >>> Prediction
         d_out = 1 if n_classes is None else n_classes
         self.blocks1 = nn.ModuleList(
-            [make_block(True) for _ in range(predictor_n_blocks)]
+            [make_predictor_block() for _ in range(predictor_n_blocks)]
         )
         self.head = nn.Sequential(
             Normalization(d_main),
@@ -252,8 +323,8 @@ class Model(nn.Module):
             assert is_train
             # Repeat the same computation for the context objects and with autograd on.
             # concat -> indexing -> encode
-            candidate_num = torch.cat[x_num, candidate_x_num]
-            candidate_cat = torch.cat[x_cat, candidate_x_cat]
+            candidate_num = torch.cat([x_num, candidate_x_num])
+            candidate_cat = torch.cat([x_cat, candidate_x_cat])
             context_k = self._encode(
                 candidate_num[context_idx], candidate_cat[context_idx]
             )[1].reshape(batch_size, context_size, -1)
@@ -274,14 +345,12 @@ class Model(nn.Module):
         context_y_emb = self.label_encoder(candidate_y[context_idx][..., None])
         values = context_y_emb + self.T(k[:, None] - context_k)
         context_x = (probs[:, None] @ values).squeeze(1)
-        x = x + context_x
+        x = x + context_x # (B, D)
 
-        # >>> prediction
+        # >>> prediction with parallel layer normalization (adapter)
+        x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
         for block in self.blocks1:
             x = x + block(x)
-        x = self.head(x)
-        # print(f"[Debug] x: {x.shape}")
-        x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
-        # print(f"[Debug] x: {x.shape}")
+        x = self.head(x) # (B, K, D)
 
         return x
