@@ -1,0 +1,83 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 128,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-2-cpu_act",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0023054966137996775,
+            "weight_decay": 0.00010307284304274608
+        },
+        "model": {
+            "arch_type": "tabm-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 608,
+                "dropout": 0.13970849364012822
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 12
+            }
+        },
+        "bins": {
+            "n_bins": 31
+        }
+    },
+    "n_parameters": 1300256,
+    "prediction_type": "labels",
+    "epoch_size": 45,
+    "best_step": 2160,
+    "metrics": {
+        "train": {
+            "rmse": 1.2242791370915287,
+            "mae": 0.9131956100463867,
+            "r2": 0.9954701906468741,
+            "score": -1.2242791370915287
+        },
+        "val": {
+            "rmse": 2.0429064301710156,
+            "mae": 1.4824681282043457,
+            "r2": 0.9900421171035898,
+            "score": -2.0429064301710156
+        },
+        "test": {
+            "rmse": 2.1851986359627085,
+            "mae": 1.5479458570480347,
+            "r2": 0.9854841014815638,
+            "score": -2.1851986359627085
+        }
+    },
+    "time": "0:00:34.666720",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        9,
+        19,
+        22,
+        27,
+        4,
+        24,
+        21,
+        27,
+        8,
+        10,
+        19
+    ],
+    "head_selection_time": "0:00:00.240008"
+}
