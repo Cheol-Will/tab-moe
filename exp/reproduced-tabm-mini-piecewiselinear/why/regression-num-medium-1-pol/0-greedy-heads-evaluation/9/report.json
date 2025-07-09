@@ -1,0 +1,78 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 9,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-pol",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00034155193386488706,
+            "weight_decay": 0.00011001201626147528
+        },
+        "model": {
+            "arch_type": "tabm-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 416,
+                "dropout": 0.22689898419466498
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 56
+        }
+    },
+    "n_parameters": 465536,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 6440,
+    "metrics": {
+        "train": {
+            "rmse": 1.589530220327641,
+            "mae": 0.7212481498718262,
+            "r2": 0.9985365634296441,
+            "score": -1.589530220327641
+        },
+        "val": {
+            "rmse": 2.184473068808217,
+            "mae": 0.9676600098609924,
+            "r2": 0.9973436371667693,
+            "score": -2.184473068808217
+        },
+        "test": {
+            "rmse": 2.409304179178631,
+            "mae": 1.0361380577087402,
+            "r2": 0.9966947511286501,
+            "score": -2.409304179178631
+        }
+    },
+    "time": "0:01:25.195279",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        3,
+        2,
+        22,
+        15,
+        17,
+        24
+    ],
+    "head_selection_time": "0:00:00.171291"
+}

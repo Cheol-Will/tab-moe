@@ -650,24 +650,6 @@ def main(
         torch.long if dataset.task.is_classification else torch.float
     )
 
-
-    def get_Xy(part: str, idx) -> tuple[dict[str, Tensor], Tensor]:
-        batch = (
-            {
-                key[2:]: dataset.data[key][part]
-                for key in dataset.data
-                if key.startswith('x_') # modify to x_
-                # if key.startswith('X_')
-            },
-            dataset.data['y'][part],
-        )
-        return (
-            batch
-            if idx is None
-            else ({k: v[idx] for k, v in batch[0].items()}, batch[1][idx])
-        )
-
-
     # >>> Model
     if 'bins' in config:
         # Compute the bins for PiecewiseLinearEncoding and PiecewiseLinearEmbeddings.
@@ -690,35 +672,52 @@ def main(
         bin_edges = None
 
     # branching for custom model
-    if config['model']['arch_type'] in ['moe-sparse', 'moe-sparse-shared']:
+    arch_type = config['model']['arch_type'] 
+    meta_data = {
+        "n_num_features": dataset.n_num_features,
+        "cat_cardinalities": dataset.compute_cat_cardinalities(),
+        "n_classes": dataset.task.try_compute_n_classes(),
+        "bins": bin_edges,
+    }
+    if arch_type in ['moe-sparse', 'moe-sparse-shared']:
         # print("Debug", "=" * 50)
-        print(f"Init Model MoE with {config['model']['arch_type']}" )
+        print(f"Init Model MoE with {arch_type}" )
         print(f"Init Model MoE with {config['model']}" )
         model = ModelMoE(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,            
         )
-    elif config['model']['arch_type'] in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
+    elif arch_type in ['tabrm', 'tabrmv2', 'tabrmv2-mini', 'tabrmv3']:
         # print("Debug", "=" * 50)
-        print(f"Init with {config['model']['arch_type']}" )
+        print(f"Init with {arch_type}" )
         print(f"Init with {config['model']}" )
         model = ModelTabRM(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,            
         )
+    elif arch_type in ['tabr', 'tabr-pln']:
+        model_args = config['model'].copy()
+        model_args.pop('arch_type', None)
+        model_args.pop('share_training_batches', None)
+        print(f"Init with {arch_type}" )
+        print(f"Init with {model_args}" )
+        if arch_type == 'tabr':
+            import tabr
+            model_args.pop('k', None)
+            model = tabr.Model(
+                **meta_data,
+                **model_args,
+            )
+        elif arch_type == 'tabr-pln':
+            import tabr_pln
+            model = tabr_pln.Model(
+                **meta_data,
+                **model_args,
+            )
     else:
         model = Model(
-            n_num_features=dataset.n_num_features,
-            cat_cardinalities=dataset.compute_cat_cardinalities(),
-            n_classes=dataset.task.try_compute_n_classes(),
+            **meta_data,
             **config['model'],
-            bins=bin_edges,
         )
     report['n_parameters'] = lib.deep.get_n_parameters(model)
     logger.info(f'n_parameters = {report["n_parameters"]}')
@@ -855,6 +854,40 @@ def main(
             )
 
             return model(x_num, x_cat, candidate_x_num, candidate_x_cat, y, candidate_y, is_train).squeeze(-1).float()        
+        
+        elif config['model']['arch_type'] in ['tabr']:
+            candidate_indices = train_indices
+            is_train = part == 'train'
+            y_train = Y_train.to(
+                    torch.long if dataset.task.is_classification else torch.float
+                )
+            if is_train:
+                candidate_indices = candidate_indices[~torch.isin(candidate_indices, idx)]
+                y = y_train[idx]
+            else:
+                candidate_indices = candidate_indices
+                y = None
+            x_num = dataset.data['x_num'][part][idx] if 'x_num' in dataset.data else None
+            x_cat = dataset.data['x_cat'][part][idx] if 'x_cat' in dataset.data else None
+            candidate_x_num = (
+                dataset.data['x_num']['train'][candidate_indices]
+                if ('x_num' in dataset.data) else None
+            )
+            candidate_x_cat = (
+                dataset.data['x_cat']['train'][candidate_indices]
+                if ('x_cat' in dataset.data) else None
+            )
+            candidate_y = y_train[candidate_indices]
+            return model(
+                x_num=x_num,
+                x_cat=x_cat,
+                y=y,
+                candidate_x_num=candidate_x_num,
+                candidate_x_cat=candidate_x_cat,
+                candidate_y=candidate_y,
+                is_train=is_train,
+            ).squeeze(-1).float()
+
         else:
             return (
                 model(
