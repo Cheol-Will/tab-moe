@@ -223,6 +223,7 @@ class Model(nn.Module):
         self.search_index = None
         self.memory_efficient = memory_efficient
         self.candidate_encoding_batch_size = candidate_encoding_batch_size
+        self.num_ensemble = k
         self.reset_parameters()
 
 
@@ -346,11 +347,11 @@ class Model(nn.Module):
         values = context_y_emb + self.T(k[:, None] - context_k)
         context_x = (probs[:, None] @ values).squeeze(1)
         x = x + context_x # (B, D)
-
         # >>> prediction with parallel layer normalization (adapter)
-        x = x.unsqueeze(1).expand(-1, self.k, -1) # (B, K, D)
+        x = x.unsqueeze(1).expand(-1, self.num_ensemble, -1) # (B, K, D)
+        
         for block in self.blocks1:
             x = x + block(x)
+        
         x = self.head(x) # (B, K, D)
-
         return x
