@@ -3,13 +3,15 @@ set -euo pipefail
 
 
 # src_type="tabrm-piecewiselinear"
-src_type="reproduced-tabr-periodic"
+src_type="rep-tabr-periodic"
 # ="mlp"
 # src_type="tabrmv2-mini-periodic"
 # src_type="mlp"
 # dest_type="tabrmv2-mini-piecewiselinear"
 # dest_type="tabrmv2-mini-periodic"
 # dest_type="tabrmoev3-periodic"
+# dest_type="tabr-pln-periodic"
+# dest_type="rep-tabr-periodic"
 dest_type="tabr-pln-periodic"
 
 # 1) Copy top-level tuning files if they don't already exist

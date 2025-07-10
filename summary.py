@@ -161,6 +161,26 @@ def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, dat
     return merged
 
 
+
+def load_benchmark_single(json_path: str) -> pd.DataFrame:
+    with open(json_path, 'r') as f:
+        raw = json.load(f)
+
+    records = []
+    for dataset, info in raw.items():
+        direction = info['direction']
+        for m in info['models']:
+            records.append({
+                'dataset': dataset,
+                'direction': direction,
+                'method':  m['method'],
+                'mean':    m.get('single_model_mean'),
+                'std':     m.get('single_model_std')
+            })
+    return pd.DataFrame.from_records(records)
+
+
+
 def main():
     model_list = [
         # 'moe-sparse-piecewiselinear', 
@@ -201,24 +221,6 @@ def main():
         'TabM',
         'TabMmini-piecewiselinear',
     ]
-    benchmark_model = [
-        'MLP',
-        'ResNet',
-        'Trompt',
-        'MLP-Mixer',
-        'Excel-plugins',
-        'SAINT',
-        'FT-T',
-        'XGBoost',
-        'LightGBM',
-        'CatBoost',
-        'TabR',
-        'TabR-periodic',
-        'MNCA',
-        'MNCA-periodic',
-        'TabM',
-        'TabMmini-piecewiselinear',
-    ]
 
     # merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
     # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
@@ -233,7 +235,9 @@ def main():
         'tabrmv4-mini-periodic',        
         'tabrmv4-shared-periodic',
         'tabrmoev4-periodic',
-        'tabrmoev4-drop-periodic'
+        'tabrmoev4-drop-periodic',
+        'tabr-pln-periodic',
+        'reproduced-tabr-periodic',
     ]    
 
     # target_model_list = [
@@ -245,27 +249,27 @@ def main():
     # ]
     for target_model in target_model_list:
     # filter_model = 'tabrmv4-shared-periodic'
-        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
+        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=bench, data_list=None, is_save=False, is_print=False)
         # print(merged)
         filtered = merged[merged[target_model].notna()]
         filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
         avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
         avg_rank.to_csv(f"output/rank_for_ppt_{target_model}.csv")
-        print(target_model)
-        print(filtered)
-        print(avg_rank)
-        print()
+        # print(target_model)
+        # print(filtered)
+        # print(avg_rank)
+        # print()
 
-    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
-    print(merged)
+    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=bench, data_list=None, is_save=False, is_print=False)
+    # print(merged)
     filtered = merged[merged["tabrmv4-mini-periodic"].notna()]
     
     filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
     avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
     filtered = filtered.T
     
-    print(filtered)
-    print(avg_rank)
+    # print(filtered)
+    # print(avg_rank)
     # file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
     # file_name = "for_ppt_250708_1541"
     # filtered.to_csv(f"output/metrics_{file_name}.csv")
@@ -277,7 +281,11 @@ def main():
     #  filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
     # filtered.to_csv("output/Temp_123.csv")
     # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
+    df = load_benchmark_single("output/paper_metrics.json") 
+    print(df)
 
+    df_target = summary_metrics_table(model_list=target_model_list, data_list=None)
+    print(df_target)
 
 if __name__ == "__main__":
     main()
