@@ -210,7 +210,8 @@ if __name__ == "__main__":
         # 'reproduced-tabr-periodic',
     ]
     # tgt = load_target_single('rep-tabr-periodic')
-    tgt = load_target_single('tabr-pln-periodic')
+    # tgt = load_target_single('tabr-pln-periodic')
+    tgt = load_target_single('tabr-pln-multihead-periodic')
     # tgt = load_target_single('retransformer-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
