@@ -201,10 +201,10 @@ if __name__ == "__main__":
         'tabrmoev4-periodic',
         'tabrmoev4-drop-periodic',
         'tabr-pln-periodic',
-        'reproduced-tabr-periodic',
+        # 'reproduced-tabr-periodic',
     ]
-    tgt = load_target_single('reproduced-tabr-periodic')
-    # tgt = load_target_single('tabr-pln-periodic')
+    # tgt = load_target_single('rep-tabr-periodic')
+    tgt = load_target_single('tabr-pln-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
         raw = json.load(f)
