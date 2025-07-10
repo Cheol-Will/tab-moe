@@ -192,19 +192,20 @@ if __name__ == "__main__":
     bench = load_benchmark("output/paper_metrics.json")
 
     target_models = [
-        'tabrmv2-piecewiselinear',        
-        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        # 'tabrmv2-piecewiselinear',        
+        # 'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
         # 'tabrmv3-mini-periodic',        
         # 'tabrmoev3-periodic',
-        'tabrmv4-mini-periodic',        
-        'tabrmv4-shared-periodic',
-        'tabrmoev4-periodic',
-        'tabrmoev4-drop-periodic',
-        'tabr-pln-periodic',
+        # 'tabrmv4-mini-periodic',        
+        # 'tabrmv4-shared-periodic',
+        # 'tabrmoev4-periodic',
+        # 'tabrmoev4-drop-periodic',
+        # 'tabr-pln-periodic',
         # 'reproduced-tabr-periodic',
     ]
     # tgt = load_target_single('rep-tabr-periodic')
-    tgt = load_target_single('tabr-pln-periodic')
+    # tgt = load_target_single('tabr-pln-periodic')
+    tgt = load_target_single('retransformer-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
         raw = json.load(f)
