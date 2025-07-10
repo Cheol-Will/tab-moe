@@ -287,9 +287,12 @@ class Model(nn.Module):
 
 
         # >>> Prediction
+        # Get Hyperparatmerse of Transformer 
+        # Note: 
+        # May need to simplify transformer. 
         d_out = 1 if n_classes is None else n_classes
         self.blocks1 = nn.ModuleList(
-            [Transformer() for _ in range(predictor_n_blocks)]
+            [Transformer(dim=d_main) for _ in range(predictor_n_blocks)]
         )
 
         self.head = nn.Sequential(
@@ -424,7 +427,8 @@ class Model(nn.Module):
 
         # >>> prediction
         for block in self.blocks1:
-            x = x + block(x)
+            x = block(x, context_k, values)
+
         x = self.head(x)
         # print(f"[Debug] x: {x.shape}")
         x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
