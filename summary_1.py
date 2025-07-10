@@ -116,7 +116,6 @@ def merge_and_rank(
                 ranks[mname] = curr_rank
 
         return pd.Series(ranks)
-
     rank_long = (
         combined
         .groupby('dataset', sort=False)
@@ -184,8 +183,15 @@ def pivot_mean_std(
 
     pivot.columns = [c.replace(" ", "_") for c in pivot.columns]
 
+    allowed_datasets = pivot.columns
+
     return pivot
 
+
+def print_directions_one_line(direction_map, datasets):
+    # "churn: higher_is_better, adult: higher_is_better, …"
+    pairs = [f"{ds}: {direction_map.get(ds.replace('_', ' '), 'unknown')[:-10]}" for ds in datasets]
+    print(", ".join(pairs))
 
 
 if __name__ == "__main__":
@@ -204,13 +210,12 @@ if __name__ == "__main__":
         # 'reproduced-tabr-periodic',
     ]
     # tgt = load_target_single('rep-tabr-periodic')
-    # tgt = load_target_single('tabr-pln-periodic')
-    tgt = load_target_single('retransformer-periodic')
+    tgt = load_target_single('tabr-pln-periodic')
+    # tgt = load_target_single('retransformer-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
         raw = json.load(f)
-    print(tgt)
-    print(bench)
+
     direction_map = {
         dataset: info["direction"]
         for dataset, info in raw.items()
@@ -224,12 +229,19 @@ if __name__ == "__main__":
         'MNCA-periodic', 'TabR-periodic',
         'TabM', 'TabMmini-piecewiselinear',
     ]
-
+    print(tgt)
+    print(bench)
     ranks = merge_and_rank(bench, tgt, direction_map, bench_models)
+    print(ranks)
     ranks_pivot = pivot_rank(ranks)
     avg_ranked = ranks_pivot.mean(axis=1).sort_values()
     mean_std_table = pivot_mean_std(bench, tgt, bench_models)
 
     print(ranks_pivot)
     print(mean_std_table)
+
+    print("\nDataset directions:")
+    print_directions_one_line(direction_map, mean_std_table.columns)
+    print()
+
     print(avg_ranked)

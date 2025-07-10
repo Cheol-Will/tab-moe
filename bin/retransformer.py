@@ -421,5 +421,4 @@ class Model(nn.Module):
         x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
         # print(f"[Debug] x: {x.shape}")
         # print("[Debug]")
-        print(f"after output head: {x.shape}")
         return x
