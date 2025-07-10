@@ -695,7 +695,7 @@ def main(
             **meta_data,
             **config['model'],
         )
-    elif arch_type in ['tabr', 'tabr-pln']:
+    elif arch_type in ['tabr', 'tabr-pln', 'retransformer']:
         model_args = config['model'].copy()
         model_args.pop('arch_type', None)
         model_args.pop('share_training_batches', None)
@@ -711,6 +711,13 @@ def main(
         elif arch_type == 'tabr-pln':
             import tabr_pln
             model = tabr_pln.Model(
+                **meta_data,
+                **model_args,
+            )
+        elif arch_type == 'retransformer':
+            import retransformer
+            model_args.pop('k', None)
+            model = retransformer.Model(
                 **meta_data,
                 **model_args,
             )
@@ -856,7 +863,7 @@ def main(
 
             return model(x_num, x_cat, candidate_x_num, candidate_x_cat, y, candidate_y, is_train).squeeze(-1).float()        
         
-        elif arch_type in ['tabr', 'tabr-pln']:
+        elif arch_type in ['tabr', 'tabr-pln', 'retransformer']:
             candidate_indices = train_indices
             is_train = part == 'train'
             y_train = Y_train.to(
