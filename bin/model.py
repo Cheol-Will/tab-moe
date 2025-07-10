@@ -763,6 +763,7 @@ def main(
     train_indices = torch.arange(train_size, device=device)
 
     def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
+        print(y_pred.shape)
         return _loss_fn(
             y_pred.flatten(0, 1),
             (
@@ -895,7 +896,6 @@ def main(
                 candidate_y=candidate_y,
                 is_train=is_train,
             ).squeeze(-1).float()
-            pred = pred.squeeze(-1).float()
             return pred
         else:
             return (

@@ -86,7 +86,9 @@ def sample_config(
                     _suggest(trial, item_distribution, label + f'.{i}', *item_args)
                     for i in range(size)
                 ]
-
+            elif distribution == "int-power-of-two":
+                power = trial.suggest_int(label, args[0], args[1], step=1)
+                return 2**power
             else:
                 return _suggest(trial, distribution, label, *args)
 
