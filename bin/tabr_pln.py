@@ -115,6 +115,7 @@ class Model(nn.Module):
         normalization: str, # BatchNorm or LayerNorm
         activation: str,
         context_size: int = 96, # always same
+        is_multihead: bool = False,
         # Below options are used only if it's needed.
         memory_efficient: bool = False,
         candidate_encoding_batch_size: None | int = None,
@@ -214,11 +215,20 @@ class Model(nn.Module):
         self.blocks1 = nn.ModuleList(
             [make_predictor_block() for _ in range(predictor_n_blocks)]
         )
-        self.head = nn.Sequential(
-            Normalization(d_main),
-            Activation(),
-            nn.Linear(d_main, d_out),
-        )
+        if is_multihead: 
+            print("Initialize multi-head output layer.")
+            self.head = nn.Sequential(
+                ParallelLayerNorm(hidden_dim=d_main, k=k),
+                Activation(),
+                lib.deep.NLinear(k, d_main, d_out),
+            )
+        else:   
+            print("Initialize single-head output layer.")
+            self.head = nn.Sequential(
+                Normalization(d_main),
+                Activation(),
+                nn.Linear(d_main, d_out),
+            )
         self.context_size = context_size
         self.search_index = None
         self.memory_efficient = memory_efficient

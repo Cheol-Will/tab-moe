@@ -3,7 +3,8 @@ set -euo pipefail
 
 
 # src_type="tabrm-piecewiselinear"
-src_type="rep-tabr-periodic"
+src_type="tabr-pln-periodic"
+# dest_type="rep-tabr-periodic"
 # ="mlp"
 # src_type="tabrmv2-mini-periodic"
 # src_type="mlp"
@@ -13,7 +14,7 @@ src_type="rep-tabr-periodic"
 # dest_type="tabr-pln-periodic"
 # dest_type="rep-tabr-periodic"
 # dest_type="tabr-pln-periodic"
-dest_type="retransformer-periodic"
+dest_type="tabr-pln-multihead-periodic"
 
 # 1) Copy top-level tuning files if they don't already exist
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")

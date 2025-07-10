@@ -763,7 +763,6 @@ def main(
     train_indices = torch.arange(train_size, device=device)
 
     def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
-        print(y_pred.shape)
         return _loss_fn(
             y_pred.flatten(0, 1),
             (
