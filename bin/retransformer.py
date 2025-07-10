@@ -23,25 +23,10 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.utils.tensorboard
-from loguru import logger
 from torch import Tensor
-from tqdm import tqdm
 
 import lib
 from lib import KWArgs
-
-
-@dataclass(frozen=True)
-class Config:
-    seed: int
-    data: Union[lib.Dataset[np.ndarray], KWArgs]  # lib.data.build_dataset
-    model: KWArgs  # Model
-    context_size: int
-    optimizer: KWArgs  # lib.deep.make_optimizer
-    batch_size: int
-    patience: Optional[int]
-    n_epochs: Union[int, float]
 
 
 class MLP(nn.Module):
@@ -83,14 +68,14 @@ class Attention(nn.Module):
     def __init__(
         self,
         dim: int,
-        num_heads: int = 8,
+        num_heads: int = 1,
         qkv_bias: bool = False,
-        qk_norm: bool = False,
-        scale_norm: bool = False,
+        qk_norm: bool = True,
+        scale_norm: bool = True,
         proj_bias: bool = False,
         attn_drop: float = 0.0,
         proj_drop: float = 0.0,
-        norm_layer: Optional[Type[nn.Module]] = None,
+        normalizaion: str = 'LayerNorm',
     ):
         super().__init__()
         assert dim % num_heads == 0
@@ -101,10 +86,11 @@ class Attention(nn.Module):
         self.q = nn.Linear(dim, dim, bias=qkv_bias)
         self.k = nn.Linear(dim, dim, bias=qkv_bias)
         self.v = nn.Linear(dim, dim, bias=qkv_bias)
-        self.q_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
-        self.k_norm = norm_layer(self.head_dim) if qk_norm else nn.Identity()
+        
+        self.q_norm = getattr(nn, normalizaion)(self.head_dim) if qk_norm else nn.Identity()
+        self.k_norm = getattr(nn, normalizaion)(self.head_dim) if qk_norm else nn.Identity()
         self.attn_drop = nn.Dropout(attn_drop)
-        self.norm = norm_layer(dim) if scale_norm else nn.Identity()
+        self.norm = getattr(nn, normalizaion)(dim) if scale_norm else nn.Identity()
         self.proj = nn.Linear(dim, dim, bias=proj_bias)
         self.proj_drop = nn.Dropout(proj_drop)
         
@@ -146,19 +132,19 @@ class Transformer(nn.Module):
     def __init__(
         self,
         dim: int,
-        num_heads: int = 8,
+        num_heads: int = 1,
         qkv_bias: bool = False,
-        qk_norm: bool = False,
-        scale_norm: bool = False,
+        qk_norm: bool = True,
+        scale_norm: bool = True,
         proj_bias: bool = False,
         attn_drop: float = 0.0,
         proj_drop: float = 0.0,
-        norm_layer: Optional[Type[nn.Module]] = None,   
+        normalizaion: str = 'LayerNorm',
         dim_multiplier: int = 2,
         mlp_drop: float = 0.0,
     ):
         super().__init__()
-        self.cross_attention(
+        self.cross_attention = Attention(
             dim=dim,
             num_heads=num_heads,
             qkv_bias=qkv_bias,
@@ -167,7 +153,7 @@ class Transformer(nn.Module):
             proj_bias=proj_bias,
             attn_drop=attn_drop,
             proj_drop=proj_drop,
-            norm_layer=norm_layer,        
+            normalizaion=normalizaion,
         )
         self.mlp = MLP(
             dim=dim,
@@ -207,7 +193,6 @@ class Model(nn.Module):
         # Below options are used only if it's needed.
         memory_efficient: bool = False,
         candidate_encoding_batch_size: None | int = None,
-        # k: str | int = None, # dummy parameter
     ):
         if not memory_efficient:
             assert candidate_encoding_batch_size is None
@@ -425,13 +410,16 @@ class Model(nn.Module):
         context_x = (probs[:, None] @ values).squeeze(1)
         x = x + context_x
 
+        # print("[Debug]")
+        # print(f"before transformer: {x.shape}")
         # >>> prediction
         for block in self.blocks1:
             x = block(x, context_k, values)
-
+    
         x = self.head(x)
         # print(f"[Debug] x: {x.shape}")
         x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
         # print(f"[Debug] x: {x.shape}")
-
+        # print("[Debug]")
+        # print(f"after output head: {x.shape}")
         return x
