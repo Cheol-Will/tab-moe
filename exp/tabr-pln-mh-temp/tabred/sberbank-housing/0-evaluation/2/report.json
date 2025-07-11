@@ -1,0 +1,74 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 9.96079792748262e-05,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "is_multihead": true,
+            "arch_type": "tabr-pln",
+            "k": 32,
+            "context_size": 96,
+            "d_main": 512,
+            "context_dropout": 0.40392618925177687,
+            "d_multiplier": 2.0,
+            "encoder_n_blocks": 0,
+            "predictor_n_blocks": 1,
+            "mixer_normalization": "auto",
+            "dropout0": 0.0,
+            "dropout1": 0.0,
+            "normalization": "LayerNorm",
+            "activation": "ReLU",
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 81,
+                "frequency_init_scale": 0.18810571187866573,
+                "d_embedding": 57,
+                "lite": true
+            }
+        }
+    },
+    "n_parameters": 13236712,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 1036,
+    "metrics": {
+        "train": {
+            "rmse": 0.23280388828965967,
+            "mae": 0.120130255818367,
+            "r2": 0.6537463938239717,
+            "score": -0.23280388828965967
+        },
+        "val": {
+            "rmse": 0.2402951311027955,
+            "mae": 0.13470877707004547,
+            "r2": 0.6143075326058159,
+            "score": -0.2402951311027955
+        },
+        "test": {
+            "rmse": 0.2689099684064189,
+            "mae": 0.19938048720359802,
+            "r2": 0.505856130118606,
+            "score": -0.2689099684064189
+        }
+    },
+    "time": "0:02:17.686886",
+    "chunk_size": null,
+    "eval_batch_size": 32768
+}

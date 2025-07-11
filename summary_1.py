@@ -123,8 +123,14 @@ def merge_and_rank(
         .reset_index()
         .rename(columns={'level_1':'method', 0:'rank'})
     )
+    high_ds = [ds for ds, dir_val in direction_map.items() if dir_val == 'higher_is_better']
+    low_ds  = [ds for ds, dir_val in direction_map.items() if dir_val == 'lower_is_better']
 
-    return rank_long
+    high_rank = rank_long[rank_long['dataset'].isin(high_ds)].reset_index(drop=True)
+    low_rank  = rank_long[rank_long['dataset'].isin(low_ds)].reset_index(drop=True)
+
+
+    return rank_long, high_rank, low_rank
 
 
 def pivot_rank(rank_long: pd.DataFrame) -> pd.DataFrame:
@@ -152,6 +158,7 @@ def pivot_mean_std(
     bench_long: pd.DataFrame,
     tgt: pd.DataFrame,
     bench_models: list[str] = None,
+    use_std: bool = True,
 ) -> pd.DataFrame:
     """
     format string : mean_std
@@ -169,10 +176,14 @@ def pivot_mean_std(
     combined = combined[combined['dataset'].isin(allowed_datasets)]
 
     def fmt(row):
-        if pd.isna(row['mean']) or pd.isna(row['std']):
-            return ""
-        return f"{row['mean']:.4f}_{row['std']:.4f}"
-
+        if use_std: 
+            if pd.isna(row['mean']) or pd.isna(row['std']):
+                return ""
+            return f"{row['mean']:.4f}±{row['std']:.4f}"
+        else:
+            if pd.isna(row['mean']) or pd.isna(row['std']):
+                return ""
+            return f"{row['mean']:.4f}"
     combined['mean_std'] = combined.apply(fmt, axis=1)
 
     pivot = combined.pivot(
@@ -195,7 +206,6 @@ def print_directions_one_line(direction_map, datasets):
 
 
 if __name__ == "__main__":
-    bench = load_benchmark("output/paper_metrics.json")
 
     target_models = [
         # 'tabrmv2-piecewiselinear',        
@@ -210,7 +220,7 @@ if __name__ == "__main__":
         # 'reproduced-tabr-periodic',
     ]
     # tgt = load_target_single('rep-tabr-periodic')
-    tgt = load_target_single('tabr-pln-periodic')
+    # tgt = load_target_single('tabr-pln-multihead-periodic')
     # tgt = load_target_single('retransformer-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
@@ -229,19 +239,35 @@ if __name__ == "__main__":
         'MNCA-periodic', 'TabR-periodic',
         'TabM', 'TabMmini-piecewiselinear',
     ]
+    # model = 'retransformer-periodic'
+    # model = 'tabr-pln-multihead-periodic'
+    # model = 'tabr-pln-periodic'
+    # model = 'rep-tabr-periodic'
+    model = "tabm-rankp-piecewiselinear"
+
+    tgt = load_target_single(model)
+    bench = load_benchmark("output/paper_metrics.json")
+
     print(tgt)
     print(bench)
-    ranks = merge_and_rank(bench, tgt, direction_map, bench_models)
-    print(ranks)
-    ranks_pivot = pivot_rank(ranks)
-    avg_ranked = ranks_pivot.mean(axis=1).sort_values()
-    mean_std_table = pivot_mean_std(bench, tgt, bench_models)
+    ranks, clf_rank, reg_rank = merge_and_rank(bench, tgt, direction_map, bench_models)
+    # rank_list = [clf_rank, reg_rank, ranks]
+    rank_list = [ranks]
+    for rank in rank_list:
+        print(rank)
+        ranks_pivot = pivot_rank(rank)
+        avg_ranked = ranks_pivot.mean(axis=1).sort_values()
+        mean_std_table = pivot_mean_std(bench, tgt, bench_models, use_std=False)
 
-    print(ranks_pivot)
-    print(mean_std_table)
+        print(ranks_pivot)
+        print(mean_std_table)
 
-    print("\nDataset directions:")
-    print_directions_one_line(direction_map, mean_std_table.columns)
-    print()
+        print("\nDataset directions:")
+        print_directions_one_line(direction_map, mean_std_table.columns)
+        print()
 
-    print(avg_ranked)
+        print(avg_ranked)
+        print()
+        
+        mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
+        avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 

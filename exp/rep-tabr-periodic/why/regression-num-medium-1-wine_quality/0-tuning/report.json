@@ -1,0 +1,182 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.model.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 128,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-num-medium-1-wine_quality",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "arch_type": "tabr",
+                "k": 1,
+                "context_size": 96,
+                "d_main": [
+                    "_tune_",
+                    "int",
+                    16,
+                    384
+                ],
+                "context_dropout": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "d_multiplier": 2.0,
+                "encoder_n_blocks": [
+                    "_tune_",
+                    "int",
+                    0,
+                    1
+                ],
+                "predictor_n_blocks": [
+                    "_tune_",
+                    "int",
+                    1,
+                    2
+                ],
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        8,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        4,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.model.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 128,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-num-medium-1-wine_quality",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 8.126431499090577e-05,
+                "weight_decay": 5.79199084837444e-05
+            },
+            "model": {
+                "arch_type": "tabr",
+                "k": 1,
+                "context_size": 96,
+                "d_main": 190,
+                "context_dropout": 0.0,
+                "d_multiplier": 2.0,
+                "encoder_n_blocks": 1,
+                "predictor_n_blocks": 1,
+                "mixer_normalization": "auto",
+                "dropout0": 0.5997759871867231,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 21,
+                    "frequency_init_scale": 0.06747434684809428,
+                    "d_embedding": 11,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 496605,
+        "prediction_type": "labels",
+        "epoch_size": 36,
+        "best_step": 5616,
+        "metrics": {
+            "train": {
+                "rmse": 0.5578274572595018,
+                "mae": 0.4044509530067444,
+                "r2": 0.5977959980966274,
+                "score": -0.5578274572595018
+            },
+            "val": {
+                "rmse": 0.5851275122477958,
+                "mae": 0.4420386254787445,
+                "r2": 0.5270026198783668,
+                "score": -0.5851275122477958
+            },
+            "test": {
+                "rmse": 0.624980973907794,
+                "mae": 0.45560967922210693,
+                "r2": 0.47198419021632176,
+                "score": -0.624980973907794
+            }
+        },
+        "time": "0:01:42.350694",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 35,
+        "tuning_time": "0:28:34.574718"
+    },
+    "time": "1:23:18.240942",
+    "n_completed_trials": 82
+}

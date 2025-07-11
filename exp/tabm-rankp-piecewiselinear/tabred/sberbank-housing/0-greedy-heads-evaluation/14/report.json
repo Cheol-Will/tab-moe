@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 14,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00269995969045987,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 17,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.28909012437135023
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 127
+        }
+    },
+    "n_parameters": 8795872,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 296,
+    "metrics": {
+        "train": {
+            "rmse": 0.23983710090292656,
+            "mae": 0.12315397709608078,
+            "r2": 0.632509116281402,
+            "score": -0.23983710090292656
+        },
+        "val": {
+            "rmse": 0.23963084820877634,
+            "mae": 0.13398486375808716,
+            "r2": 0.6164369612014031,
+            "score": -0.23963084820877634
+        },
+        "test": {
+            "rmse": 0.24741094275395809,
+            "mae": 0.16925644874572754,
+            "r2": 0.5817101138584466,
+            "score": -0.24741094275395809
+        }
+    },
+    "time": "0:01:08.575705",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        21,
+        1
+    ],
+    "head_selection_time": "0:00:00.065100"
+}

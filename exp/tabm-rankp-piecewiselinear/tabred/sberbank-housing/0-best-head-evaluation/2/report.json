@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00269995969045987,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 17,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.28909012437135023
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 127
+        }
+    },
+    "n_parameters": 8795872,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 518,
+    "metrics": {
+        "train": {
+            "rmse": 0.22930697007840153,
+            "mae": 0.12463467568159103,
+            "r2": 0.6640703260552049,
+            "score": -0.22930697007840153
+        },
+        "val": {
+            "rmse": 0.24034390627506638,
+            "mae": 0.13386346399784088,
+            "r2": 0.614150905398771,
+            "score": -0.24034390627506638
+        },
+        "test": {
+            "rmse": 0.2448921234215476,
+            "mae": 0.15420758724212646,
+            "r2": 0.5901837280065729,
+            "score": -0.2448921234215476
+        }
+    },
+    "time": "0:01:19.539501",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        6
+    ],
+    "head_selection_time": "0:00:00.021246"
+}

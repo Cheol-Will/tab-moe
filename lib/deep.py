@@ -282,6 +282,184 @@ class LinearEfficientEnsemble(nn.Module):
         return x
 
 
+
+class RankOneEnsemble(nn.Module):
+    """
+    BatchEnsemble-like layer with a rank-1 factorized main weight for each ensemble member.
+    The full weight for member i is W_i = u_i v_i^T.
+    """
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        *,
+        k: int,
+        ensemble_scaling_in: bool,
+        ensemble_scaling_out: bool,
+        ensemble_bias: bool,
+        scaling_init: Literal['ones', 'random-signs'],
+    ):
+        super().__init__()
+        assert k > 0, "Ensemble size k must be positive"
+
+        # Rank-1 factors per ensemble member
+        # u: (k, out_features), v: (k, in_features)
+        self.u = nn.Parameter(torch.empty(k, out_features))
+        self.v = nn.Parameter(torch.empty(k, in_features))
+
+        # Optional input/output scaling and bias per ensemble member
+        self.r = nn.Parameter(torch.empty(k, in_features)) if ensemble_scaling_in else None
+        self.s = nn.Parameter(torch.empty(k, out_features)) if ensemble_scaling_out else None
+        if bias:
+            self.bias = (
+                nn.Parameter(torch.empty(k, out_features)) if ensemble_bias
+                else nn.Parameter(torch.empty(out_features))
+            )
+        else:
+            self.bias = None
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.k = k
+        self.scaling_init = scaling_init
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        # Initialize rank-1 factors with fan-in based uniform
+        init_rsqrt_uniform_(self.u, self.in_features)
+        init_rsqrt_uniform_(self.v, self.in_features)
+        # Initialize scaling and bias
+        scaling_init_fn = {'ones': nn.init.ones_, 'random-signs': init_random_signs_}[self.scaling_init]
+        if self.r is not None:
+            scaling_init_fn(self.r)
+        if self.s is not None:
+            scaling_init_fn(self.s)
+        if self.bias is not None:
+            # shared bias or per-member bias initialized uniformly
+            bias_tensor = self.bias
+            if bias_tensor.ndim == 1:
+                init_rsqrt_uniform_(bias_tensor, self.in_features)
+            else:
+                init_rsqrt_uniform_(bias_tensor, self.in_features)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (B, k, in_features)
+        assert x.ndim == 3 and x.size(-1) == self.in_features
+
+        # Input scaling if enabled
+        if self.r is not None:
+            x = x * self.r
+
+        # Build weight tensors: W_i = u_i outer v_i
+        # u: (k, out), v: (k, in) -> W: (k, out, in)
+        W = self.u.unsqueeze(2) * self.v.unsqueeze(1)
+
+        # Batch-ensemble matmul: for each member i, x[:, i, :] @ W[i].T
+        # Using einsum to vectorize: 'bki,koi->bko'
+        y = torch.einsum('bki,koi->bko', x, W)
+
+        # Output scaling if enabled
+        if self.s is not None:
+            y = y * self.s
+
+        # Add bias if present
+        if self.bias is not None:
+            y = y + self.bias
+
+        return y
+
+
+class RankPEnsemble(nn.Module):
+    """
+    BatchEnsemble-like layer with a rank-p factorized main weight for each ensemble member.
+    The full weight for member i is: W_i = sum_{j=1}^p u_{i,j} v_{i,j}^T
+    """
+
+    def __init__(
+        self,
+        in_features: int,
+        out_features: int,
+        bias: bool = True,
+        *,
+        k: int,
+        p: int,
+        ensemble_scaling_in: bool,
+        ensemble_scaling_out: bool,
+        ensemble_bias: bool,
+        scaling_init: Literal['ones', 'random-signs'],
+    ):
+        super().__init__()
+        assert k > 0 and p > 0, "Ensemble size k and rank p must be positive"
+
+        # Rank-p factors per ensemble member
+        self.u = nn.Parameter(torch.empty(k, p, out_features))  # (k, p, O)
+        self.v = nn.Parameter(torch.empty(k, p, in_features))   # (k, p, I)
+
+        # Optional input/output scaling
+        self.r = nn.Parameter(torch.empty(k, in_features)) if ensemble_scaling_in else None
+        self.s = nn.Parameter(torch.empty(k, out_features)) if ensemble_scaling_out else None
+
+        # Bias term
+        if bias:
+            self.bias = (
+                nn.Parameter(torch.empty(k, out_features)) if ensemble_bias
+                else nn.Parameter(torch.empty(out_features))
+            )
+        else:
+            self.bias = None
+
+        self.in_features = in_features
+        self.out_features = out_features
+        self.k = k
+        self.p = p
+        self.scaling_init = scaling_init
+
+        self.reset_parameters()
+
+    def reset_parameters(self) -> None:
+        for j in range(self.p):
+            init_rsqrt_uniform_(self.u[:, j, :], self.in_features)
+            init_rsqrt_uniform_(self.v[:, j, :], self.in_features)
+
+        scaling_init_fn = {
+            'ones': nn.init.ones_,
+            'random-signs': init_random_signs_,
+        }[self.scaling_init]
+
+        if self.r is not None:
+            scaling_init_fn(self.r)
+        if self.s is not None:
+            scaling_init_fn(self.s)
+
+        if self.bias is not None:
+            init_rsqrt_uniform_(self.bias, self.in_features)
+
+    def forward(self, x: Tensor) -> Tensor:
+        # x: (B, k, in_features)
+        assert x.ndim == 3 and x.size(-1) == self.in_features
+
+        if self.r is not None:
+            x = x * self.r  # (B, k, in)
+
+        # rank-p weight: (k, p, O) x (k, p, I) -> (k, O, I)
+        W = torch.einsum('kpo,kpi->koi', self.u, self.v)
+
+        # matmul: (B, k, in) @ (k, in, out)^T -> (B, k, out)
+        y = torch.einsum('bki,koi->bko', x, W)
+
+        if self.s is not None:
+            y = y * self.s
+
+        if self.bias is not None:
+            y = y + self.bias
+
+        return y
+
+
+
+
 class MLP(nn.Module):
     def __init__(
         self,

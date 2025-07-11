@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 10,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00269995969045987,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 17,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.28909012437135023
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 127
+        }
+    },
+    "n_parameters": 8795872,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 370,
+    "metrics": {
+        "train": {
+            "rmse": 0.23238762835630966,
+            "mae": 0.12131261825561523,
+            "r2": 0.6549835192683628,
+            "score": -0.23238762835630966
+        },
+        "val": {
+            "rmse": 0.24206122059512292,
+            "mae": 0.13605369627475739,
+            "r2": 0.6086172313741525,
+            "score": -0.24206122059512292
+        },
+        "test": {
+            "rmse": 0.2387706311908498,
+            "mae": 0.15403276681900024,
+            "r2": 0.6104157542556139,
+            "score": -0.2387706311908498
+        }
+    },
+    "time": "0:01:15.248752",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        21
+    ],
+    "head_selection_time": "0:00:00.024040"
+}

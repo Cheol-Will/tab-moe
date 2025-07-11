@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00269995969045987,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 17,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 720,
+                "dropout": 0.28909012437135023
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 127
+        }
+    },
+    "n_parameters": 8795872,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 518,
+    "metrics": {
+        "train": {
+            "rmse": 0.23169748435054216,
+            "mae": 0.12145879119634628,
+            "r2": 0.6570297396940085,
+            "score": -0.23169748435054216
+        },
+        "val": {
+            "rmse": 0.2406379210111694,
+            "mae": 0.13687166571617126,
+            "r2": 0.6132062655676203,
+            "score": -0.2406379210111694
+        },
+        "test": {
+            "rmse": 0.24350998107958882,
+            "mae": 0.1612124890089035,
+            "r2": 0.5947965251984202,
+            "score": -0.24350998107958882
+        }
+    },
+    "time": "0:01:18.144659",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        31
+    ],
+    "head_selection_time": "0:00:00.048934"
+}
