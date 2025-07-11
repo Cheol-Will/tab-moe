@@ -1,0 +1,78 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 9,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003313696137201971,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 46,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 608,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 56
+        }
+    },
+    "n_parameters": 5254088,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 320,
+    "metrics": {
+        "train": {
+            "rmse": 0.8275115061879095,
+            "mae": 0.608638346195221,
+            "r2": 0.2090464937413291,
+            "score": -0.8275115061879095
+        },
+        "val": {
+            "rmse": 0.8448192038479277,
+            "mae": 0.6252619028091431,
+            "r2": 0.15356565053941906,
+            "score": -0.8448192038479277
+        },
+        "test": {
+            "rmse": 0.8636571833733891,
+            "mae": 0.6346652507781982,
+            "r2": 0.14517054437265353,
+            "score": -0.8636571833733891
+        }
+    },
+    "time": "0:00:19.494775",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        9,
+        31,
+        14,
+        20,
+        29
+    ],
+    "head_selection_time": "0:00:00.152981"
+}

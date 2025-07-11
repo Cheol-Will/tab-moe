@@ -193,6 +193,7 @@ class Model(nn.Module):
         # Below options are used only if it's needed.
         memory_efficient: bool = False,
         candidate_encoding_batch_size: None | int = None,
+        aux_loss_weight: None | float = None,
     ):
         if not memory_efficient:
             assert candidate_encoding_batch_size is None
@@ -285,12 +286,17 @@ class Model(nn.Module):
             Activation(),
             nn.Linear(d_main, d_out),
         )
+        self.aux_head = nn.Sequential(
+            Normalization(d_main),
+            Activation(),
+            nn.Linear(d_main, d_out),
+        ) 
         self.context_size = context_size
         self.search_index = None
         self.memory_efficient = memory_efficient
         self.candidate_encoding_batch_size = candidate_encoding_batch_size
+        self.aux_loss_weight = aux_loss_weight
         self.reset_parameters()
-
 
     def reset_parameters(self):
         if isinstance(self.label_encoder, nn.Linear):
@@ -335,23 +341,27 @@ class Model(nn.Module):
         with torch.set_grad_enabled(
             torch.is_grad_enabled() and not self.memory_efficient
         ):
-            candidate_k = (
-                self._encode(x_num=candidate_x_num, x_cat=candidate_x_cat)[1]
-                if self.candidate_encoding_batch_size is None
-                else torch.cat(
-                    [
-                        self._encode(num_batch, cat_batch)[1]
-                        for num_batch, cat_batch in zip(
-                            delu.iter_batches(candidate_x_num, self.candidate_encoding_batch_size, shuffle=False),
-                            delu.iter_batches(candidate_x_cat, self.candidate_encoding_batch_size, shuffle=False)
-                        )
-                    ]
+            if self.candidate_encoding_batch_size is None:
+                candidate_x, candidate_k = self._encode(
+                    x_num=candidate_x_num, x_cat=candidate_x_cat
                 )
-            )
+            else:
+                candidate_x_chunks, candidate_k_chunks = [], []
+                for num_batch, cat_batch in zip(
+                    delu.iter_batches(candidate_x_num, self.candidate_encoding_batch_size, shuffle=False),
+                    delu.iter_batches(candidate_x_cat, self.candidate_encoding_batch_size, shuffle=False),
+                ):
+                    x_chunk, k_chunk = self._encode(num_batch, cat_batch)
+                    candidate_x_chunks.append(x_chunk)
+                    candidate_k_chunks.append(k_chunk)
+                candidate_x = torch.cat(candidate_x_chunks)
+                candidate_k = torch.cat(candidate_k_chunks)
+
         x, k = self._encode(x_num, x_cat)
         if is_train:
             # include current queries since they are excluded from candidate
             assert y is not None
+            candidate_x = torch.cat([x, candidate_x])
             candidate_k = torch.cat([k, candidate_k])
             candidate_y = torch.cat([y, candidate_y])
         else:
@@ -389,36 +399,30 @@ class Model(nn.Module):
             # concat -> indexing -> encode
             candidate_num = torch.cat([x_num, candidate_x_num])
             candidate_cat = torch.cat([x_cat, candidate_x_cat])
-            context_k = self._encode(
+            context_x, context_k = self._encode(
                 candidate_num[context_idx], candidate_cat[context_idx]
-            )[1].reshape(batch_size, context_size, -1)
+            )
+            context_x = context_x.reshape(batch_size, context_size, -1)
+            context_k = context_k.reshape(batch_size, context_size, -1)
         else:
             context_k = candidate_k[context_idx]
+            context_x = candidate_x[context_idx]
 
         # 
-        similarities = (
-            -k.square().sum(-1, keepdim=True)
-            + (2 * (k[..., None, :] @ context_k.transpose(-1, -2))).squeeze(-2)
-            - context_k.square().sum(-1)
-        )
-        probs = F.softmax(similarities, dim=-1)
-        probs = self.dropout(probs) # (B, K)
-
-
         context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, K, D)
         values = context_y_emb + self.T(k[:, None] - context_k) # (B, K, D)
-        context_x = (probs[:, None] @ values).squeeze(1)
-        x = x + context_x
 
-        # print("[Debug]")
-        # print(f"before transformer: {x.shape}")
         # >>> prediction
+        # add auxiliary loss for training.
+        
+        # Note that L2 distance is measured by K = self.K(x)
+        # cross attention is performed under x and values.        
+        out = x
         for block in self.blocks1:
-            x = block(x, context_k, values)
-    
-        x = self.head(x)
-        # print(f"[Debug] x: {x.shape}")
-        x = x[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
-        # print(f"[Debug] x: {x.shape}")
-        # print("[Debug]")
-        return x
+            out = block(out, context_x, values)
+        out = self.head(out)[:, None] # (B, D_OUT) -> (B, 1, D_OUT)
+
+        if self.aux_loss_weight is not None and self.training:
+            return out, self.aux_head(x)[:, None]            
+        else:         
+            return out

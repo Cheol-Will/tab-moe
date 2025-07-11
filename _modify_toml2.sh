@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEST_ROOT="exp/rep-tabr-periodic/why"
+DEST_ROOT="exp/retransformer-aux-periodic"
 
 find "${DEST_ROOT}" -type f -name "0-tuning.toml" -print0 | while IFS= read -r -d '' file; do
-  # 2) replace d_main
-  if grep -q '^d_main = \[' "$file"; then
-    sed -i '/^d_main = \[/,/^]/c\
-d_main = [\
+
+  # [space.model] add p
+  if grep -q '^\[space\.model\]' "$file" && ! grep -q '^p *= *\[' "$file"; then
+    sed -i '/^\[space\.model\]/a \
+aux_loss_weight = [\
     "_tune_",\
-    "int",\
-    16,\
-    384,\
+    "loguniform",\
+    0.01,\
+    1.0,\
 ]' "$file"
-    echo "Replaced d_main block in: $file"
+    echo "Inserted p parameter under [space.model] in: $file"
   fi
+
 done

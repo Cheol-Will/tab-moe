@@ -118,6 +118,7 @@ class Model(nn.Module):
         ],
         k: None | int = None,
         share_training_batches: bool = DEFAULT_SHARE_TRAINING_BATCHES,
+        p: None | int = None,
     ) -> None:
         # >>> Validate arguments.
         assert n_num_features >= 0
@@ -208,6 +209,46 @@ class Model(nn.Module):
                     first_adapter_sections,
                 )
 
+            elif arch_type in ('tabm-rankone'):
+                # 
+                assert first_adapter_init is not None
+                print("Initialize with Rank One Ensemble.")
+                lib.deep.make_efficient_ensemble(
+                    self.backbone,
+                    lib.deep.RankOneEnsemble,
+                    k=k,
+                    ensemble_scaling_in=True,
+                    ensemble_scaling_out=True,
+                    ensemble_bias=True,
+                    scaling_init='ones',
+                )
+                _init_first_adapter(
+                    _get_first_ensemble_layer(self.backbone).r,  # type: ignore[code]
+                    first_adapter_init,
+                    first_adapter_sections,
+                )
+
+            elif arch_type in ('tabm-rankp'):
+
+                assert first_adapter_init is not None
+                print("Initialize with Rank P Ensemble.")
+                lib.deep.make_efficient_ensemble(
+                    self.backbone,
+                    lib.deep.RankPEnsemble,
+                    k=k,
+                    p=p,
+                    ensemble_scaling_in=True,
+                    ensemble_scaling_out=True,
+                    ensemble_bias=True,
+                    scaling_init='ones',
+                )
+                _init_first_adapter(
+                    _get_first_ensemble_layer(self.backbone).r,  # type: ignore[code]
+                    first_adapter_init,
+                    first_adapter_sections,
+                )
+                
+
             elif arch_type in ('tabm-mini', 'tabm-mini-normal'):
                 # MiniEnsemble
                 assert first_adapter_init is not None
@@ -293,6 +334,9 @@ class Model(nn.Module):
             # (B, D_OUT) -> (B, 1, D_OUT)
             x = x[:, None]
         return x
+
+
+
 
 
 class ModelMoE(nn.Module):
@@ -1014,7 +1058,13 @@ def main(
         )
         for batch_idx in tqdm(batches, desc=f'Epoch {step // epoch_size} Step {step}'):
             optimizer.zero_grad()
-            loss = loss_fn(apply_model('train', batch_idx), Y_train[batch_idx])
+            if 'aux_loss_weight' not in config['model']:
+                loss = loss_fn(apply_model('train', batch_idx), Y_train[batch_idx])
+            else:
+                pred, aux_pred = apply_model('train', batch_idx)
+                loss = loss_fn(pred, Y_train[batch_idx]) + config['model']['aux_loss_weight'] * loss_fn(aux_pred, Y_train[batch_idx])
+
+
             if grad_scaler is None:
                 loss.backward()
             else:
