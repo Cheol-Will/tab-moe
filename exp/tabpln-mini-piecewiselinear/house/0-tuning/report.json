@@ -1,0 +1,162 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.model.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "gradient_clipping_norm": 1.0,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/house",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    0.0001,
+                    0.003
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    0.0001,
+                    0.1
+                ]
+            },
+            "model": {
+                "arch_type": "tabpln-mini",
+                "k": 32,
+                "share_training_batches": false,
+                "backbone": {
+                    "type": "MLP",
+                    "n_blocks": [
+                        "_tune_",
+                        "int",
+                        1,
+                        4
+                    ],
+                    "d_block": [
+                        "_tune_",
+                        "int",
+                        64,
+                        1024,
+                        16
+                    ],
+                    "dropout": [
+                        "_tune_",
+                        "?uniform",
+                        0.0,
+                        0.0,
+                        0.5
+                    ]
+                },
+                "num_embeddings": {
+                    "type": "PiecewiseLinearEmbeddingsV2",
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        8,
+                        32,
+                        4
+                    ]
+                }
+            },
+            "bins": {
+                "n_bins": [
+                    "_tune_",
+                    "int",
+                    2,
+                    128
+                ]
+            }
+        }
+    },
+    "best": {
+        "function": "bin.model.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "gradient_clipping_norm": 1.0,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/house",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 0.0016785467954593429,
+                "weight_decay": 0.00022281962758118474
+            },
+            "model": {
+                "arch_type": "tabpln-mini",
+                "k": 32,
+                "share_training_batches": false,
+                "backbone": {
+                    "type": "MLP",
+                    "n_blocks": 4,
+                    "d_block": 1008,
+                    "dropout": 0.4295035198934519
+                },
+                "num_embeddings": {
+                    "type": "PiecewiseLinearEmbeddingsV2",
+                    "d_embedding": 16
+                }
+            },
+            "bins": {
+                "n_bins": 2
+            }
+        },
+        "n_parameters": 3359712,
+        "prediction_type": "labels",
+        "epoch_size": 57,
+        "best_step": 7980,
+        "metrics": {
+            "train": {
+                "rmse": 15608.844672172248,
+                "mae": 10304.515625,
+                "r2": 0.9102804949297502,
+                "score": -15608.844672172248
+            },
+            "val": {
+                "rmse": 28054.73051020095,
+                "mae": 14298.828125,
+                "r2": 0.7358815646954928,
+                "score": -28054.73051020095
+            },
+            "test": {
+                "rmse": 30286.326419689794,
+                "mae": 14667.8203125,
+                "r2": 0.6822679410934857,
+                "score": -30286.326419689794
+            }
+        },
+        "time": "0:01:43.787038",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 51,
+        "tuning_time": "0:36:58.828618"
+    },
+    "time": "1:12:03.139846",
+    "n_completed_trials": 100
+}

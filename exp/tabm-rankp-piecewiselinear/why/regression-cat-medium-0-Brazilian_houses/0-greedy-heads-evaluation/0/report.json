@@ -1,0 +1,81 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003035764029343937,
+            "weight_decay": 0.023937441872925586
+        },
+        "model": {
+            "p": 4,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 944,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 12
+            }
+        },
+        "bins": {
+            "n_bins": 60
+        }
+    },
+    "n_parameters": 1230816,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 10350,
+    "metrics": {
+        "train": {
+            "rmse": 0.015366886145748848,
+            "mae": 0.006253264844417572,
+            "r2": 0.9996331965608393,
+            "score": -0.015366886145748848
+        },
+        "val": {
+            "rmse": 0.01590473602834717,
+            "mae": 0.006946058012545109,
+            "r2": 0.9996080088238388,
+            "score": -0.01590473602834717
+        },
+        "test": {
+            "rmse": 0.020176219811939896,
+            "mae": 0.007133138366043568,
+            "r2": 0.9993339738718714,
+            "score": -0.020176219811939896
+        }
+    },
+    "time": "0:02:35.885232",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        2,
+        21,
+        19,
+        30,
+        21,
+        28,
+        21
+    ],
+    "head_selection_time": "0:00:00.154454"
+}

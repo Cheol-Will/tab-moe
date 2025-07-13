@@ -15,8 +15,8 @@
 
 # arch_type="rep-tabr-periodic"
 
-# arch_type="tabm-rankp-piecewiselinear"
-arch_type="retransformer-aux-periodic"
+# arch_type="tabpln-mini-piecewiselinear"
+arch_type="taba-piecewiselinear"
 
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")
 data_list=(

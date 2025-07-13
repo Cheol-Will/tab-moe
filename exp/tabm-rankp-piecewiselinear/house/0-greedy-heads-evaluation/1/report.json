@@ -1,0 +1,80 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 1,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/house",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003333991503448506,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 23,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 800,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 2
+        }
+    },
+    "n_parameters": 4527520,
+    "prediction_type": "labels",
+    "epoch_size": 57,
+    "best_step": 8436,
+    "metrics": {
+        "train": {
+            "rmse": 15646.446241878697,
+            "mae": 10122.630859375,
+            "r2": 0.909847705447929,
+            "score": -15646.446241878697
+        },
+        "val": {
+            "rmse": 28187.22206958323,
+            "mae": 14578.7314453125,
+            "r2": 0.7333810040861677,
+            "score": -28187.22206958323
+        },
+        "test": {
+            "rmse": 30525.535539937704,
+            "mae": 14910.9365234375,
+            "r2": 0.6772290576470914,
+            "score": -30525.535539937704
+        }
+    },
+    "time": "0:02:30.349941",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        14,
+        12,
+        21,
+        20,
+        19,
+        26,
+        8
+    ],
+    "head_selection_time": "0:00:00.167630"
+}

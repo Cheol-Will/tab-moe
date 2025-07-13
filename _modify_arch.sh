@@ -2,14 +2,27 @@
 set -euo pipefail
 
 # DEST_ROOT="exp/rep-ensemble"
-DEST_ROOT="exp/tabm-rankp-piecewiselinear"
+DEST_ROOT="exp/taba-piecewiselinear"
 
 find "${DEST_ROOT}" -type f -name "0-tuning.toml" -print0 | while IFS= read -r -d '' file; do
   # Replace arch_type = "tabm" with "tabm-rankone"
-  if grep -q '^arch_type *= *"tabm-rankone"' "$file"; then
-    sed -i 's/^arch_type *= *"tabm-rankone"/arch_type = "tabm-rankp"/' "$file"
+  if grep -q '^arch_type *= *"tabm"' "$file"; then
+    sed -i 's/^arch_type *= *"tabm"/arch_type = "taba"/' "$file"
     echo "Replaced arch_type in: $file"
   fi
+
+
+  if grep -q '^n_blocks = \[' "$file"; then
+    sed -i '/^n_blocks = \[/,/^]/c\
+n_blocks = [\
+    "_tune_",\
+    "int",\
+    1,\
+    10,\
+]' "$file"
+    echo "Replaced n_blocks block in: $file"
+  fi
+
 
   # add p=
 done
