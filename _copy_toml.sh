@@ -24,7 +24,7 @@ src_type="tabm-piecewiselinear"
 
 # dest_type="retransformer-aux-periodic"
 
-dest_type="taba-piecewiselinear"
+dest_type="taba-k128-piecewiselinear"
 
 # 1) Copy top-level tuning files if they don't already exist
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")
