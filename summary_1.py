@@ -243,7 +243,8 @@ if __name__ == "__main__":
     # model = 'tabr-pln-multihead-periodic'
     # model = 'tabr-pln-periodic'
     # model = 'rep-tabr-periodic'
-    model = "tabm-rankp-piecewiselinear"
+    # model = "tabm-rankp-piecewiselinear"
+    model = 'retransformer-aux-periodic'
 
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")

@@ -930,6 +930,8 @@ def main(
                 if ('x_cat' in dataset.data) else None
             )
             candidate_y = y_train[candidate_indices]
+            # if 'aux_loss_weight' not in config['model']:
+
             pred = model(
                 x_num=x_num,
                 x_cat=x_cat,
@@ -938,8 +940,12 @@ def main(
                 candidate_x_cat=candidate_x_cat,
                 candidate_y=candidate_y,
                 is_train=is_train,
-            ).squeeze(-1).float()
-            return pred
+            )
+            if isinstance(pred, tuple):
+                return pred[0].squeeze(-1).float(), pred[1].squeeze(-1).float(), 
+
+            else:
+                return pred.squeeze(-1).float()
         else:
             return (
                 model(
