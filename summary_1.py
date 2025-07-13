@@ -185,14 +185,20 @@ def pivot_mean_std(
     combined = combined[combined['dataset'].isin(allowed_datasets)]
 
     def fmt(row):
-        if use_std: 
-            if pd.isna(row['mean']) or pd.isna(row['std']):
+        if not use_std:
+            if pd.isna(row['mean']):
                 return ""
-            return f"{row['mean']:.4f}±{row['std']:.4f}"
+            else:
+                return f"{row['mean']:.4f}"
         else:
-            if pd.isna(row['mean']) or pd.isna(row['std']):
-                return ""
-            return f"{row['mean']:.4f}"
+            if pd.isna(row['std']):
+                if pd.isna(row['mean']):
+                    return ""
+                else:
+                    return f"{row['mean']:.4f}"
+            else:
+                return f"{row['mean']:.4f}±{row['std']:.4f}"
+
     combined['mean_std'] = combined.apply(fmt, axis=1)
 
     pivot = combined.pivot(
@@ -253,7 +259,8 @@ if __name__ == "__main__":
     # model = 'tabr-pln-periodic'
     # model = 'rep-tabr-periodic'
     # model = "tabm-rankp-piecewiselinear"
-    model = "tabpln-mini-piecewiselinear"
+    # model = "tabpln-mini-piecewiselinear"
+    model = "taba-piecewiselinear"
 
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")
@@ -282,7 +289,7 @@ if __name__ == "__main__":
         mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
         avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 
 
-    tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
-    ranks_pivot = pivot_rank(tabm_bench)
-    avg_ranked = ranks_pivot.mean(axis=1).sort_values()
-    print(avg_ranked)
+    # tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
+    # ranks_pivot = pivot_rank(tabm_bench)
+    # avg_ranked = ranks_pivot.mean(axis=1).sort_values()
+    # print(avg_ranked)
