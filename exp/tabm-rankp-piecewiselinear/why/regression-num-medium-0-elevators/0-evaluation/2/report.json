@@ -1,0 +1,70 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-elevators",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0005853981108016701,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 21,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 96,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 2
+        }
+    },
+    "n_parameters": 712224,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 12800,
+    "metrics": {
+        "train": {
+            "rmse": 0.0016984120284405714,
+            "mae": 0.0012890762882307172,
+            "r2": 0.9346921156696107,
+            "score": -0.0016984120284405714
+        },
+        "val": {
+            "rmse": 0.0018983193298993002,
+            "mae": 0.0013997555943205953,
+            "r2": 0.9207627926632216,
+            "score": -0.0018983193298993002
+        },
+        "test": {
+            "rmse": 0.0018638728292097485,
+            "mae": 0.0013990049483254552,
+            "r2": 0.926090496135506,
+            "score": -0.0018638728292097485
+        }
+    },
+    "time": "0:02:28.096602",
+    "chunk_size": null,
+    "eval_batch_size": 32768
+}

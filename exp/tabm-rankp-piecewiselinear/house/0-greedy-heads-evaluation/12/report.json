@@ -1,0 +1,82 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 12,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/house",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003333991503448506,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "p": 23,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 800,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 2
+        }
+    },
+    "n_parameters": 4527520,
+    "prediction_type": "labels",
+    "epoch_size": 57,
+    "best_step": 11229,
+    "metrics": {
+        "train": {
+            "rmse": 12162.47080160935,
+            "mae": 8255.6259765625,
+            "r2": 0.9455260342925759,
+            "score": -12162.47080160935
+        },
+        "val": {
+            "rmse": 27824.46923123602,
+            "mae": 14150.6025390625,
+            "r2": 0.7401992770672119,
+            "score": -27824.46923123602
+        },
+        "test": {
+            "rmse": 31080.561127495752,
+            "mae": 14965.6806640625,
+            "r2": 0.6653848766227806,
+            "score": -31080.561127495752
+        }
+    },
+    "time": "0:03:02.034775",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        3,
+        13,
+        21,
+        5,
+        23,
+        22,
+        30,
+        13,
+        27
+    ],
+    "head_selection_time": "0:00:00.206513"
+}

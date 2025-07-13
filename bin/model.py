@@ -28,6 +28,8 @@ if __name__ == '__main__':
 import lib
 import lib.data
 import lib.deep
+import lib.pln
+import lib.adapter
 import lib.env
 from lib import KWArgs, PartKey
 
@@ -54,6 +56,9 @@ def _init_first_adapter(
     from irrelevant experiments to the final models. Perhaps, the code related
     to `init_sections` can be simply removed, but this was not tested.
     """
+    # print("[Debug]: ")
+    # print(f"weight: {weight.shape}")
+    # print(f"init_sections: {sum(init_sections)}")
     assert weight.ndim == 2
     assert weight.shape[1] == sum(init_sections)
 
@@ -115,6 +120,7 @@ class Model(nn.Module):
             'tabm-mini-normal',
             # Mixture of Experts (ours)
             # 'moe-mlp',
+            'tabm-pln',
         ],
         k: None | int = None,
         share_training_batches: bool = DEFAULT_SHARE_TRAINING_BATCHES,
@@ -208,7 +214,23 @@ class Model(nn.Module):
                     first_adapter_init,
                     first_adapter_sections,
                 )
-
+            elif arch_type in ('taba'):
+                assert first_adapter_init is not None
+                print("Initialize with Adapter Ensemble.")
+                lib.deep.make_efficient_ensemble(
+                    self.backbone,
+                    lib.adapter.AdapterEnsemble,
+                    k=k,
+                    # ensemble_scaling_in=True,
+                    # ensemble_scaling_out=True,
+                    ensemble_bias=True,
+                    scaling_init='ones',
+                )
+                _init_first_adapter(
+                    _get_first_ensemble_layer(self.backbone).r,  # type: ignore[code]
+                    first_adapter_init,
+                    first_adapter_sections,
+                )
             elif arch_type in ('tabm-rankone'):
                 # 
                 assert first_adapter_init is not None
@@ -248,6 +270,20 @@ class Model(nn.Module):
                     first_adapter_sections,
                 )
                 
+            elif arch_type in ('tabpln-mini'):
+                assert first_adapter_init is not None
+                print("Initialize with TabPLN Mini Ensemble.")
+                self.minimal_ensemble_adapter = lib.pln.ScalePLNEnsemble(
+                    k,
+                    d_flat,
+                    init='random-signs' if num_embeddings is None else 'normal',
+                )
+                _init_first_adapter(
+                    self.minimal_ensemble_adapter.pln.weight,  # type: ignore[code]
+                    first_adapter_init,
+                    first_adapter_sections,
+                )
+                 
 
             elif arch_type in ('tabm-mini', 'tabm-mini-normal'):
                 # MiniEnsemble
@@ -766,6 +802,7 @@ def main(
                 **model_args,
             )
     else:
+        print(f"Init with {arch_type}")
         model = Model(
             **meta_data,
             **config['model'],

@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 14,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003035764029343937,
+            "weight_decay": 0.023937441872925586
+        },
+        "model": {
+            "p": 4,
+            "arch_type": "tabm-rankp",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 944,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 12
+            }
+        },
+        "bins": {
+            "n_bins": 60
+        }
+    },
+    "n_parameters": 1230816,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 10740,
+    "metrics": {
+        "train": {
+            "rmse": 0.016270053675965956,
+            "mae": 0.008328716270625591,
+            "r2": 0.9995888127406817,
+            "score": -0.016270053675965956
+        },
+        "val": {
+            "rmse": 0.021416558444931975,
+            "mae": 0.00997148733586073,
+            "r2": 0.9992892403933358,
+            "score": -0.021416558444931975
+        },
+        "test": {
+            "rmse": 0.020035909285880983,
+            "mae": 0.009273317642509937,
+            "r2": 0.9993432050537236,
+            "score": -0.020035909285880983
+        }
+    },
+    "time": "0:02:39.917592",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        19
+    ],
+    "head_selection_time": "0:00:00.027022"
+}

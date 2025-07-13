@@ -74,20 +74,29 @@ def merge_and_rank(
     direction_map: dict[str,str],
     bench_models: list[str] = None,           
 ) -> pd.DataFrame:
-    tgt = tgt_long.copy()
-    tgt['direction'] = tgt['dataset'].map(direction_map)
+    if tgt_long is not None:
+        tgt = tgt_long.copy()
+        tgt['direction'] = tgt['dataset'].map(direction_map)
 
-    cols = ['dataset','direction','method','mean','std']
-    combined = pd.concat([bench_long[cols], tgt[cols]], ignore_index=True)
+        cols = ['dataset','direction','method','mean','std']
+        combined = pd.concat([bench_long[cols], tgt[cols]], ignore_index=True)
 
-    if bench_models is not None:
-        tgt_models = tgt['method'].unique().tolist()
-        allowed_models = set(bench_models) | set(tgt_models)
-        combined = combined[combined['method'].isin(allowed_models)]
+        if bench_models is not None:
+            tgt_models = tgt['method'].unique().tolist()
+            allowed_models = set(bench_models) | set(tgt_models)
+            combined = combined[combined['method'].isin(allowed_models)]
 
-    allowed_datasets = tgt['dataset'].unique().tolist()
-    combined = combined[combined['dataset'].isin(allowed_datasets)]
-    
+        allowed_datasets = tgt['dataset'].unique().tolist()
+        combined = combined[combined['dataset'].isin(allowed_datasets)]
+    else:
+        combined = bench_long
+        if bench_models is not None:
+            allowed_models = set(bench_models) 
+            combined = combined[combined['method'].isin(allowed_models)]
+        cols = ['dataset','direction','method','mean','std']
+        combined = combined[cols]
+
+
     def rank_group(g):
         direction = g['direction'].iat[0]
         ascending = (direction == 'lower_is_better')
@@ -243,7 +252,8 @@ if __name__ == "__main__":
     # model = 'tabr-pln-multihead-periodic'
     # model = 'tabr-pln-periodic'
     # model = 'rep-tabr-periodic'
-    model = "tabm-rankp-piecewiselinear"
+    # model = "tabm-rankp-piecewiselinear"
+    model = "tabpln-mini-piecewiselinear"
 
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")
@@ -271,3 +281,8 @@ if __name__ == "__main__":
         
         mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
         avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 
+
+    tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
+    ranks_pivot = pivot_rank(tabm_bench)
+    avg_ranked = ranks_pivot.mean(axis=1).sort_values()
+    print(avg_ranked)
