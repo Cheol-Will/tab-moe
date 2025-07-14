@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 6,
+        "batch_size": 128,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-wine_quality",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0029326342349442255,
+            "weight_decay": 0.00014597458706911676
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 128,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 816,
+                "dropout": 0.15771843080911316
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 24
+            }
+        },
+        "bins": {
+            "n_bins": 9
+        }
+    },
+    "n_parameters": 878672,
+    "prediction_type": "labels",
+    "epoch_size": 36,
+    "best_step": 7200,
+    "metrics": {
+        "train": {
+            "rmse": 0.1426124204906229,
+            "mae": 0.11472588032484055,
+            "r2": 0.9737117708997515,
+            "score": -0.1426124204906229
+        },
+        "val": {
+            "rmse": 0.6016589248463827,
+            "mae": 0.4381425380706787,
+            "r2": 0.4998982227094353,
+            "score": -0.6016589248463827
+        },
+        "test": {
+            "rmse": 0.6405616124124934,
+            "mae": 0.46120283007621765,
+            "r2": 0.4453293879245518,
+            "score": -0.6405616124124934
+        }
+    },
+    "time": "0:01:03.533456",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        26,
+        8,
+        71,
+        126
+    ],
+    "head_selection_time": "0:00:00.373169"
+}

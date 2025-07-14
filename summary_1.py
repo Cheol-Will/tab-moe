@@ -260,7 +260,10 @@ if __name__ == "__main__":
     # model = 'rep-tabr-periodic'
     # model = "tabm-rankp-piecewiselinear"
     # model = "tabpln-mini-piecewiselinear"
-    model = "taba-piecewiselinear"
+    # model = "taba-piecewiselinear"
+    # model = "tabrmv4-mini-periodic"
+    # model = "tabrmoev4-drop-periodic"
+    model = "taba-k128-piecewiselinear"
 
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")
