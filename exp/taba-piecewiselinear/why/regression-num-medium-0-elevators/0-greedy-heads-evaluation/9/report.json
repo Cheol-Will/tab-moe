@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 9,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-elevators",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00016776252212474503,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 5,
+                "d_block": 528,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 39
+        }
+    },
+    "n_parameters": 245792,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 21080,
+    "metrics": {
+        "train": {
+            "rmse": 0.0016497432113029265,
+            "mae": 0.001254471717402339,
+            "r2": 0.938381345605492,
+            "score": -0.0016497432113029265
+        },
+        "val": {
+            "rmse": 0.0018811097162770803,
+            "mae": 0.0014072706690058112,
+            "r2": 0.9221929639681387,
+            "score": -0.0018811097162770803
+        },
+        "test": {
+            "rmse": 0.0018674396949258487,
+            "mae": 0.0014126383466646075,
+            "r2": 0.9258073476467871,
+            "score": -0.0018674396949258487
+        }
+    },
+    "time": "0:03:57.850648",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        2,
+        20,
+        4,
+        19,
+        7
+    ],
+    "head_selection_time": "0:00:00.137513"
+}

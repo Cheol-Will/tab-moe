@@ -30,6 +30,7 @@ import lib.data
 import lib.deep
 import lib.pln
 import lib.adapter
+import lib.adapter_moe
 import lib.env
 from lib import KWArgs, PartKey
 
@@ -231,6 +232,16 @@ class Model(nn.Module):
                     first_adapter_init,
                     first_adapter_sections,
                 )
+            elif arch_type in ('taba-moe'):
+                assert first_adapter_init is not None
+                print("Initialize with Adapter MoE")
+                lib.deep.make_efficient_ensemble(
+                    self.backbone,
+                    lib.adapter_moe.AdapterMoE,
+                    k=k,
+                    ensemble_bias=True,
+                    scaling_init='ones',
+                )    
             elif arch_type in ('tabm-rankone'):
                 # 
                 assert first_adapter_init is not None
@@ -332,7 +343,9 @@ class Model(nn.Module):
     def forward(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None
     ) -> Tensor:
-        # preprocess
+        # >>> preprocess
+        # Apply one hot encoder for categorical features and 
+        # specified embedding for numerical features.
         x = []
         
         if x_num is not None:

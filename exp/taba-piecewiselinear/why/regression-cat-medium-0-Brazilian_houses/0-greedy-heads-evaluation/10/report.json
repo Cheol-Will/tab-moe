@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 10,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0007288202935935668,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 8,
+                "d_block": 1008,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 7
+        }
+    },
+    "n_parameters": 592560,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 9900,
+    "metrics": {
+        "train": {
+            "rmse": 0.01431280819323427,
+            "mae": 0.007752991747111082,
+            "r2": 0.9996817917950873,
+            "score": -0.01431280819323427
+        },
+        "val": {
+            "rmse": 0.02105958965684483,
+            "mae": 0.009397626854479313,
+            "r2": 0.9993127366315863,
+            "score": -0.02105958965684483
+        },
+        "test": {
+            "rmse": 0.02915866057979778,
+            "mae": 0.009713063016533852,
+            "r2": 0.9986089368262132,
+            "score": -0.02915866057979778
+        }
+    },
+    "time": "0:02:03.133211",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        20,
+        19,
+        23
+    ],
+    "head_selection_time": "0:00:00.083719"
+}

@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 5,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0007288202935935668,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 8,
+                "d_block": 1008,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 7
+        }
+    },
+    "n_parameters": 592560,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 6870,
+    "metrics": {
+        "train": {
+            "rmse": 0.02789732631316094,
+            "mae": 0.01035638339817524,
+            "r2": 0.9987911097930066,
+            "score": -0.02789732631316094
+        },
+        "val": {
+            "rmse": 0.032897073383739615,
+            "mae": 0.012989065609872341,
+            "r2": 0.9983229812729161,
+            "score": -0.032897073383739615
+        },
+        "test": {
+            "rmse": 0.023632081272698186,
+            "mae": 0.012080968357622623,
+            "r2": 0.9990862747197372,
+            "score": -0.023632081272698186
+        }
+    },
+    "time": "0:01:28.073341",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        12,
+        18
+    ],
+    "head_selection_time": "0:00:00.066786"
+}

@@ -53,7 +53,8 @@ class ParallelBatchNorm(nn.Module):
         else:
             print('WARNING: Wrong init type - PBNs are not initilized.')
 
-    def batch_norm(self, input, running)
+    def batch_norm(self, input, running):
+        pass
 
 
     def forward(self, x):

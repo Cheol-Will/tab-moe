@@ -1,0 +1,78 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 13,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-fifa",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0007139895976967542,
+            "weight_decay": 0.0038970846242162055
+        },
+        "model": {
+            "arch_type": "tabpln-mini",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 2,
+                "d_block": 928,
+                "dropout": 0.22425815041089073
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 28
+            }
+        },
+        "bins": {
+            "n_bins": 99
+        }
+    },
+    "n_parameters": 1043688,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 840,
+    "metrics": {
+        "train": {
+            "rmse": 0.7089070679943872,
+            "mae": 0.526404619216919,
+            "r2": 0.7330672222757211,
+            "score": -0.7089070679943872
+        },
+        "val": {
+            "rmse": 0.7421552952254267,
+            "mae": 0.5480836629867554,
+            "r2": 0.7032367961533149,
+            "score": -0.7421552952254267
+        },
+        "test": {
+            "rmse": 0.769988219616928,
+            "mae": 0.5666238069534302,
+            "r2": 0.6688605419838705,
+            "score": -0.769988219616928
+        }
+    },
+    "time": "0:00:14.054206",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        4,
+        13,
+        1,
+        31,
+        8,
+        30
+    ],
+    "head_selection_time": "0:00:00.164764"
+}

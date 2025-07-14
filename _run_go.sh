@@ -7,7 +7,9 @@
 
 # arch_type="tabpln-mini-piecewiselinear"
 # arch_type="taba-piecewiselinear"
-arch_type="taba-k128-piecewiselinear"
+# arch_type="taba-k128-piecewiselinear"
+# arch_type="taba-piecewiselinear"
+arch_type="taba-moe-piecewiselinear"
 
 # data_list=("churn" "house" "adult" "california" "diamond" "otto" "higgs-small" "black-friday" "microsoft" "covtype2")
 data_list=(

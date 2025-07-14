@@ -1,0 +1,80 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 11,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-fifa",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0003962682136310472,
+            "weight_decay": 0.00034221939738390275
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 7,
+                "d_block": 288,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 100
+        }
+    },
+    "n_parameters": 169756,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 4560,
+    "metrics": {
+        "train": {
+            "rmse": 0.7205132955506419,
+            "mae": 0.5299072861671448,
+            "r2": 0.718663233095321,
+            "score": -0.7205132955506419
+        },
+        "val": {
+            "rmse": 0.7452945523130362,
+            "mae": 0.5503174662590027,
+            "r2": 0.7043867599246663,
+            "score": -0.7452945523130362
+        },
+        "test": {
+            "rmse": 0.7858023570911089,
+            "mae": 0.5753114223480225,
+            "r2": 0.6656447148449463,
+            "score": -0.7858023570911089
+        }
+    },
+    "time": "0:00:48.212747",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        3,
+        16,
+        8,
+        14,
+        20,
+        4,
+        16,
+        29
+    ],
+    "head_selection_time": "0:00:00.200471"
+}

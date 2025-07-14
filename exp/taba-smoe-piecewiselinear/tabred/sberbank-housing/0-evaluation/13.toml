@@ -1,0 +1,35 @@
+seed = 13
+batch_size = 256
+patience = 16
+n_epochs = -1
+gradient_clipping_norm = 1.0
+amp = true
+
+[data]
+cache = true
+path = "data/sberbank-housing"
+num_policy = "noisy-quantile"
+cat_policy = "ordinal"
+
+[optimizer]
+type = "AdamW"
+lr = 0.00016702355113141603
+weight_decay = 0.0004488255073518783
+
+[model]
+arch_type = "taba-moe"
+k = 32
+share_training_batches = false
+
+[model.backbone]
+type = "MLP"
+n_blocks = 3
+d_block = 528
+dropout = 0.374202485226339
+
+[model.num_embeddings]
+type = "PiecewiseLinearEmbeddingsV2"
+d_embedding = 20
+
+[bins]
+n_bins = 91
