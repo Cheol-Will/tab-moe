@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 9,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0007288202935935668,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 8,
+                "d_block": 1008,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 7
+        }
+    },
+    "n_parameters": 592560,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 10830,
+    "metrics": {
+        "train": {
+            "rmse": 0.012205581578959733,
+            "mae": 0.008123555220663548,
+            "r2": 0.9997685918798426,
+            "score": -0.012205581578959733
+        },
+        "val": {
+            "rmse": 0.019148171497870473,
+            "mae": 0.010784193873405457,
+            "r2": 0.9994318304594508,
+            "score": -0.019148171497870473
+        },
+        "test": {
+            "rmse": 0.03669578723232886,
+            "mae": 0.010798518545925617,
+            "r2": 0.9977968499374689,
+            "score": -0.03669578723232886
+        }
+    },
+    "time": "0:02:14.700364",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        24,
+        14
+    ],
+    "head_selection_time": "0:00:00.064309"
+}

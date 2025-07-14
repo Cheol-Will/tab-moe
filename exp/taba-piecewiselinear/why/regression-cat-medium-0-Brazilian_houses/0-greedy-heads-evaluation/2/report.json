@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0007288202935935668,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 8,
+                "d_block": 1008,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 7
+        }
+    },
+    "n_parameters": 592560,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 11280,
+    "metrics": {
+        "train": {
+            "rmse": 0.011102637563013999,
+            "mae": 0.007149782497435808,
+            "r2": 0.999808524156992,
+            "score": -0.011102637563013999
+        },
+        "val": {
+            "rmse": 0.015763233819867408,
+            "mae": 0.008785832673311234,
+            "r2": 0.9996149527811852,
+            "score": -0.015763233819867408
+        },
+        "test": {
+            "rmse": 0.024475924080763715,
+            "mae": 0.009232688695192337,
+            "r2": 0.9990198559501842,
+            "score": -0.024475924080763715
+        }
+    },
+    "time": "0:02:18.775216",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        12,
+        9,
+        18
+    ],
+    "head_selection_time": "0:00:00.084887"
+}

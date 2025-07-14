@@ -332,7 +332,9 @@ class Model(nn.Module):
     def forward(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None
     ) -> Tensor:
-        # preprocess
+        # >>> preprocess
+        # Apply one hot encoder for categorical features and 
+        # specified embedding for numerical features.
         x = []
         
         if x_num is not None:

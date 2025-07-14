@@ -1,0 +1,78 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 512,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-medical_charges",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0008547181742737334,
+            "weight_decay": 0.0001606344490117633
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 10,
+                "d_block": 256,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 3
+        }
+    },
+    "n_parameters": 181392,
+    "prediction_type": "labels",
+    "epoch_size": 20,
+    "best_step": 2720,
+    "metrics": {
+        "train": {
+            "rmse": 0.07913059420060421,
+            "mae": 0.05123419314622879,
+            "r2": 0.9800078994266095,
+            "score": -0.07913059420060421
+        },
+        "val": {
+            "rmse": 0.08186505148047087,
+            "mae": 0.05171255022287369,
+            "r2": 0.9791281508927708,
+            "score": -0.08186505148047087
+        },
+        "test": {
+            "rmse": 0.08114174109098474,
+            "mae": 0.051410164684057236,
+            "r2": 0.9795445148864858,
+            "score": -0.08114174109098474
+        }
+    },
+    "time": "0:00:56.961653",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        25,
+        14,
+        17,
+        22,
+        24,
+        8
+    ],
+    "head_selection_time": "0:00:00.395956"
+}

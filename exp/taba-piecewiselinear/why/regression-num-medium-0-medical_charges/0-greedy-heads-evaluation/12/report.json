@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 12,
+        "batch_size": 512,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-medical_charges",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0008547181742737334,
+            "weight_decay": 0.0001606344490117633
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 10,
+                "d_block": 256,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 3
+        }
+    },
+    "n_parameters": 181392,
+    "prediction_type": "labels",
+    "epoch_size": 20,
+    "best_step": 3820,
+    "metrics": {
+        "train": {
+            "rmse": 0.07885566213433562,
+            "mae": 0.05143041908740997,
+            "r2": 0.9801465793552908,
+            "score": -0.07885566213433562
+        },
+        "val": {
+            "rmse": 0.08173377447339764,
+            "mae": 0.05196724086999893,
+            "r2": 0.9791950365574619,
+            "score": -0.08173377447339764
+        },
+        "test": {
+            "rmse": 0.08108262074824056,
+            "mae": 0.05172250047326088,
+            "r2": 0.9795743091548706,
+            "score": -0.08108262074824056
+        }
+    },
+    "time": "0:01:21.711929",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        31,
+        22,
+        12
+    ],
+    "head_selection_time": "0:00:00.247331"
+}
