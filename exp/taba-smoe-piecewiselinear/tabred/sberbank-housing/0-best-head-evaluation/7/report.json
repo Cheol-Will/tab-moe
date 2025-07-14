@@ -1,0 +1,74 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 7,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00016702355113141603,
+            "weight_decay": 0.0004488255073518783
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 528,
+                "dropout": 0.374202485226339
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 91
+        }
+    },
+    "n_parameters": 5595360,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 444,
+    "metrics": {
+        "train": {
+            "rmse": 0.23555556830057772,
+            "mae": 0.12510104477405548,
+            "r2": 0.6455127843727606,
+            "score": -0.23555556830057772
+        },
+        "val": {
+            "rmse": 0.24016597208163754,
+            "mae": 0.13078798353672028,
+            "r2": 0.6147220117444803,
+            "score": -0.24016597208163754
+        },
+        "test": {
+            "rmse": 0.23723887092045087,
+            "mae": 0.14814874529838562,
+            "r2": 0.6153982137822926,
+            "score": -0.23723887092045087
+        }
+    },
+    "time": "0:01:10.398768",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        5
+    ],
+    "head_selection_time": "0:00:00.020328"
+}

@@ -60,7 +60,7 @@ class AdapterEnsemble(nn.Module):
         super().__init__()
         hidden_dim = out_features
 
-        # Have linear operation if this is the first adapter.
+        # Weight is valid only if this is the first adapter.
         if in_features != out_features:
             self.weight = nn.Parameter(torch.empty(hidden_dim, in_features))
         else:
@@ -120,6 +120,9 @@ class AdapterEnsemble(nn.Module):
         # Apply scaling and and add bias.
         if self.r is not None:
             x = x * self.r
+
+        # weight is only used in the first block
+        # to project f -> d.
         if self.weight is not None:
             x = x @ self.weight.T
        

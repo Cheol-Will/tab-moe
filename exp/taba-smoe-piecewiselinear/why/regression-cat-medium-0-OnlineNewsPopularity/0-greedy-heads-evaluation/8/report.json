@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 8,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0001021581083011645,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 2,
+                "d_block": 1024,
+                "dropout": 0.3305467640520976
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 14
+        }
+    },
+    "n_parameters": 1660344,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 360,
+    "metrics": {
+        "train": {
+            "rmse": 0.8226128431789029,
+            "mae": 0.6053920984268188,
+            "r2": 0.21838327217049303,
+            "score": -0.8226128431789029
+        },
+        "val": {
+            "rmse": 0.8446996783790955,
+            "mae": 0.6251353025436401,
+            "r2": 0.15380526844444298,
+            "score": -0.8446996783790955
+        },
+        "test": {
+            "rmse": 0.8617701358639411,
+            "mae": 0.6344163417816162,
+            "r2": 0.14890198741111527,
+            "score": -0.8617701358639411
+        }
+    },
+    "time": "0:00:09.100329",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        12,
+        27,
+        23
+    ],
+    "head_selection_time": "0:00:00.106738"
+}

@@ -1,0 +1,74 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 14,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00016702355113141603,
+            "weight_decay": 0.0004488255073518783
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 528,
+                "dropout": 0.374202485226339
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 91
+        }
+    },
+    "n_parameters": 5595360,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 666,
+    "metrics": {
+        "train": {
+            "rmse": 0.20452432789756816,
+            "mae": 0.11177298426628113,
+            "r2": 0.7327585964667889,
+            "score": -0.20452432789756816
+        },
+        "val": {
+            "rmse": 0.24176405220158687,
+            "mae": 0.13173146545886993,
+            "r2": 0.6095776245268285,
+            "score": -0.24176405220158687
+        },
+        "test": {
+            "rmse": 0.2416206848792324,
+            "mae": 0.1497156023979187,
+            "r2": 0.6010598207167527,
+            "score": -0.2416206848792324
+        }
+    },
+    "time": "0:01:19.818260",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        16
+    ],
+    "head_selection_time": "0:00:00.020746"
+}

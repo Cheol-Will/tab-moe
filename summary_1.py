@@ -219,6 +219,13 @@ def print_directions_one_line(direction_map, datasets):
     pairs = [f"{ds}: {direction_map.get(ds.replace('_', ' '), 'unknown')[:-10]}" for ds in datasets]
     print(", ".join(pairs))
 
+def merge_tag(tgt, model2):
+    model2_tgt = load_target_single(model2)
+    main_datasets = tgt['dataset'].unique().tolist()
+    model2_tgt = model2_tgt[model2_tgt['dataset'].isin(main_datasets)]
+    tgt = pd.concat([tgt, model2_tgt], ignore_index=True)
+    return tgt
+    
 
 if __name__ == "__main__":
 
@@ -252,24 +259,35 @@ if __name__ == "__main__":
         'T2G', 'MNCA', 'TabR', 'MLP-piecewiselinear',
         'LightGBM', 'XGBoost', 'CatBoost',
         'MNCA-periodic', 'TabR-periodic',
-        'TabM', 'TabMmini-piecewiselinear',
+        # 'TabM', 'TabMmini-piecewiselinear',
     ]
     # model = 'retransformer-periodic'
     # model = 'tabr-pln-multihead-periodic'
     # model = 'tabr-pln-periodic'
     # model = 'rep-tabr-periodic'
     # model = "tabm-rankp-piecewiselinear"
-    # model = "tabpln-mini-piecewiselinear"
     # model = "taba-piecewiselinear"
     # model = "tabrmv4-mini-periodic"
     # model = "tabrmoev4-drop-periodic"
-    model = "taba-k128-piecewiselinear"
+    # model = "taba-k128-piecewiselinear"
+    # model = "taba-piecewiselinear"
+    # model = "tabpln-mini-piecewiselinear"
+    model = "taba-piecewiselinear"
+    # model = "taba-moe-piecewiselinear"
 
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")
-
     print(tgt)
-    print(bench)
+
+    # additional model
+    # need to merge this model
+    tgt = merge_tag(tgt, 'tabm-piecewiselinear')
+    tgt = merge_tag(tgt, 'tabm-mini-piecewiselinear')
+    tgt = merge_tag(tgt, 'tabm')
+
+
+
+    # print(bench)
     ranks, clf_rank, reg_rank = merge_and_rank(bench, tgt, direction_map, bench_models)
     # rank_list = [clf_rank, reg_rank, ranks]
     rank_list = [ranks]
