@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 12,
+        "batch_size": 128,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-cpu_act",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00040973773756855373,
+            "weight_decay": 0.0023358825194833557
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 6,
+                "d_block": 80,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 24
+            }
+        },
+        "bins": {
+            "n_bins": 121
+        }
+    },
+    "n_parameters": 206288,
+    "prediction_type": "labels",
+    "epoch_size": 45,
+    "best_step": 1665,
+    "metrics": {
+        "train": {
+            "rmse": 1.8766359821451286,
+            "mae": 1.3869171142578125,
+            "r2": 0.9890038744377158,
+            "score": -1.8766359821451286
+        },
+        "val": {
+            "rmse": 2.1903180090929792,
+            "mae": 1.5895578861236572,
+            "r2": 0.9892996887767377,
+            "score": -2.1903180090929792
+        },
+        "test": {
+            "rmse": 2.3197533547078804,
+            "mae": 1.6590708494186401,
+            "r2": 0.9847028537751175,
+            "score": -2.3197533547078804
+        }
+    },
+    "time": "0:00:48.651265",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        26,
+        18,
+        24,
+        2,
+        5
+    ],
+    "head_selection_time": "0:00:00.145326"
+}
