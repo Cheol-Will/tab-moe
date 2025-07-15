@@ -90,6 +90,7 @@ def summary_hyperparameters(model_list, output_path="output/average_hyperparamet
         if is_print:
             print(model)
             print(dfh)
+            print(dfh.mean(axis=0))
             print()
 
         avg_row = dfh.mean().rename(model)
@@ -182,110 +183,116 @@ def load_benchmark_single(json_path: str) -> pd.DataFrame:
 
 
 def main():
-    model_list = [
-        # 'moe-sparse-piecewiselinear', 
-        # 'moe-sparse-shared-piecewiselinear',
-        # 'moe-mini-sparse-piecewiselinear',
-        # 'moe-mini-sparse-shared-piecewiselinear',
-        # 'tabrm-piecewiselinear', # Retrieval + Shared MLP
-        'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-        # 'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
-        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-        # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
-        # 'tabrmv3-cs-periodic',
-        # 'tabrmv3-mini-cs-periodic',
-        # 'tabrmv3-shared-cs-periodic'
-        # 'tabrmoev3-periodic',
-        # current -------------------------
-        'tabrmv3-mini-periodic',        
-        'tabrmoev3-periodic',
-        'tabrmv4-mini-periodic',        
-        'tabrmv4-shared-periodic',
-        'tabrmoev4-periodic',
-        # 'tabrmv4-moe-periodic',
-    ]
-    bench = [
-        'MLP',
-        'Excel-plugins',
-        'SAINT',
-        'FT-T',
-        'T2G',
-        'MNCA',
-        'TabR',
-        'MLP-piecewiselinear',
-        'LightGBM',
-        'XGBoost',
-        'CatBoost',
-        'MNCA-periodic',
-        'TabR-periodic',
-        'TabM',
-        'TabMmini-piecewiselinear',
-    ]
-
-    # merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
-    # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
-    
-    target_model_list = [
-        # 'moe-sparse-piecewiselinear', 
-        # 'moe-mini-sparse-shared-piecewiselinear',
-        'tabrmv2-piecewiselinear',        
-        'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-        # 'tabrmv3-mini-periodic',        
-        # 'tabrmoev3-periodic',
-        'tabrmv4-mini-periodic',        
-        'tabrmv4-shared-periodic',
-        'tabrmoev4-periodic',
-        'tabrmoev4-drop-periodic',
-        'tabr-pln-periodic',
-        'reproduced-tabr-periodic',
-    ]    
-
-    # target_model_list = [
-    #     'tabrm-piecewiselinear', # Retrieval + Shared MLP
+    # model_list = [
+    #     # 'moe-sparse-piecewiselinear', 
+    #     # 'moe-sparse-shared-piecewiselinear',
+    #     # 'moe-mini-sparse-piecewiselinear',
+    #     # 'moe-mini-sparse-shared-piecewiselinear',
+    #     # 'tabrm-piecewiselinear', # Retrieval + Shared MLP
     #     'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-    #     'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+    #     # 'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
     #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-    #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini        
+    #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
+    #     # 'tabrmv3-cs-periodic',
+    #     # 'tabrmv3-mini-cs-periodic',
+    #     # 'tabrmv3-shared-cs-periodic'
+    #     # 'tabrmoev3-periodic',
+    #     # current -------------------------
+    #     'tabrmv3-mini-periodic',        
+    #     'tabrmoev3-periodic',
+    #     'tabrmv4-mini-periodic',        
+    #     'tabrmv4-shared-periodic',
+    #     'tabrmoev4-periodic',
+    #     # 'tabrmv4-moe-periodic',
     # ]
-    for target_model in target_model_list:
-    # filter_model = 'tabrmv4-shared-periodic'
-        merged = merge_and_calculate_rank(model=[target_model], benchmark_model=bench, data_list=None, is_save=False, is_print=False)
-        # print(merged)
-        filtered = merged[merged[target_model].notna()]
-        filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
-        avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
-        avg_rank.to_csv(f"output/rank_for_ppt_{target_model}.csv")
-        # print(target_model)
-        # print(filtered)
-        # print(avg_rank)
-        # print()
+    # bench = [
+    #     'MLP',
+    #     'Excel-plugins',
+    #     'SAINT',
+    #     'FT-T',
+    #     'T2G',
+    #     'MNCA',
+    #     'TabR',
+    #     'MLP-piecewiselinear',
+    #     'LightGBM',
+    #     'XGBoost',
+    #     'CatBoost',
+    #     'MNCA-periodic',
+    #     'TabR-periodic',
+    #     'TabM',
+    #     'TabMmini-piecewiselinear',
+    # ]
 
-    merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=bench, data_list=None, is_save=False, is_print=False)
-    # print(merged)
-    filtered = merged[merged["tabrmv4-mini-periodic"].notna()]
+    # # merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
+    # # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
     
-    filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
-    avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
-    filtered = filtered.T
-    
-    # print(filtered)
-    # print(avg_rank)
-    # file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # file_name = "for_ppt_250708_1541"
-    # filtered.to_csv(f"output/metrics_{file_name}.csv")
-    # avg_rank.to_csv(f"output/ranks_{file_name}.csv")
+    # target_model_list = [
+    #     # 'moe-sparse-piecewiselinear', 
+    #     # 'moe-mini-sparse-shared-piecewiselinear',
+    #     'tabrmv2-piecewiselinear',        
+    #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+    #     # 'tabrmv3-mini-periodic',        
+    #     # 'tabrmoev3-periodic',
+    #     'tabrmv4-mini-periodic',        
+    #     'tabrmv4-shared-periodic',
+    #     'tabrmoev4-periodic',
+    #     'tabrmoev4-drop-periodic',
+    #     'tabr-pln-periodic',
+    #     'reproduced-tabr-periodic',
+    # ]    
 
-    # filtered = merged[merged['tabrmoev3-periodic'].notna()]
-    
-    #
-    #  filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
-    # filtered.to_csv("output/Temp_123.csv")
-    # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
-    df = load_benchmark_single("output/paper_metrics.json") 
-    print(df)
+    # # target_model_list = [
+    # #     'tabrm-piecewiselinear', # Retrieval + Shared MLP
+    # #     'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
+    # #     'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
+    # #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+    # #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini        
+    # # ]
+    # for target_model in target_model_list:
+    # # filter_model = 'tabrmv4-shared-periodic'
+    #     merged = merge_and_calculate_rank(model=[target_model], benchmark_model=bench, data_list=None, is_save=False, is_print=False)
+    #     # print(merged)
+    #     filtered = merged[merged[target_model].notna()]
+    #     filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
+    #     avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
+    #     avg_rank.to_csv(f"output/rank_for_ppt_{target_model}.csv")
+    #     # print(target_model)
+    #     # print(filtered)
+    #     # print(avg_rank)
+    #     # print()
 
-    df_target = summary_metrics_table(model_list=target_model_list, data_list=None)
-    print(df_target)
+    # merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=bench, data_list=None, is_save=False, is_print=False)
+    # # print(merged)
+    # filtered = merged[merged["tabrmv4-mini-periodic"].notna()]
+    
+    # filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
+    # avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
+    # filtered = filtered.T
+    
+    # # print(filtered)
+    # # print(avg_rank)
+    # # file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
+    # # file_name = "for_ppt_250708_1541"
+    # # filtered.to_csv(f"output/metrics_{file_name}.csv")
+    # # avg_rank.to_csv(f"output/ranks_{file_name}.csv")
+
+    # # filtered = merged[merged['tabrmoev3-periodic'].notna()]
+    
+    # #
+    # #  filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
+    # # filtered.to_csv("output/Temp_123.csv")
+    # # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
+    # df = load_benchmark_single("output/paper_metrics.json") 
+    # print(df)
+
+    # df_target = summary_metrics_table(model_list=target_model_list, data_list=None)
+    # print(df_target)
+
+    summary_hyperparameters(['tabm-mini-piecewiselinear'], is_print=True)
+    summary_hyperparameters(['tabm-piecewiselinear'], is_print=True)
+    # summary_hyperparameters(['tabpln-mini-piecewiselinear'], is_print=True)
+    # summary_hyperparameters(['taba-k128-piecewiselinear'], is_print=True)
+
 
 if __name__ == "__main__":
     main()

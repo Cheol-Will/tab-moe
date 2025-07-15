@@ -239,7 +239,7 @@ class Model(nn.Module):
                     self.backbone,
                     lib.adapter_moe.AdapterMoE,
                     k=k,
-                    ensemble_bias=True,
+                    ensemble_bias=True, # 
                     scaling_init='ones',
                 )    
             elif arch_type in ('tabm-rankone'):

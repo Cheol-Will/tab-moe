@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 2,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00011546030581026548,
+            "weight_decay": 0.021327157363685574
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 208,
+                "dropout": 0.31164791667659336
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 49
+        }
+    },
+    "n_parameters": 124464,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 720,
+    "metrics": {
+        "train": {
+            "rmse": 0.8198185114522715,
+            "mae": 0.6038592457771301,
+            "r2": 0.22368435644723061,
+            "score": -0.8198185114522715
+        },
+        "val": {
+            "rmse": 0.8447854434974578,
+            "mae": 0.6257525086402893,
+            "r2": 0.15363336658746485,
+            "score": -0.8447854434974578
+        },
+        "test": {
+            "rmse": 0.8616237003477658,
+            "mae": 0.6352121233940125,
+            "r2": 0.14919119128935676,
+            "score": -0.8616237003477658
+        }
+    },
+    "time": "0:00:18.620179",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        16,
+        18,
+        0,
+        29
+    ],
+    "head_selection_time": "0:00:00.153706"
+}

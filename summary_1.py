@@ -111,7 +111,9 @@ def merge_and_rank(
             mname = sg.loc[i,'method']
             mmean = sg.loc[i,'mean']
             mstd  = sg.loc[i,'std']
-
+            if pd.isna(mmean) or pd.isna(mstd):
+                print(f"[WARN] NaN found in first row of group: {sg[['method', 'mean', 'std']]}")
+                mstd = 0
             if direction == 'higher_is_better':
                 same_tier = (mmean >= ref_mean - ref_std)
             else:
@@ -225,7 +227,24 @@ def merge_tag(tgt, model2):
     model2_tgt = model2_tgt[model2_tgt['dataset'].isin(main_datasets)]
     tgt = pd.concat([tgt, model2_tgt], ignore_index=True)
     return tgt
-    
+
+
+def add_arrow(mean_std_table, direction_map):
+    """
+    Using direction map add upper arrow or lower arrow into dataset names (column)
+
+    """
+    rename_map = {}
+    for col in mean_std_table.columns:
+        ds_name = col.replace('_', ' ')
+        direction = direction_map.get(ds_name)
+        if direction == 'higher_is_better':
+            rename_map[col] = f"{col} ↑"
+        elif direction == 'lower_is_better':
+            rename_map[col] = f"{col} ↓"
+
+    return mean_std_table.rename(columns=rename_map)
+
 
 if __name__ == "__main__":
 
@@ -272,10 +291,11 @@ if __name__ == "__main__":
     # model = "taba-k128-piecewiselinear"
     # model = "taba-piecewiselinear"
     # model = "tabpln-mini-piecewiselinear"
-    model = "taba-piecewiselinear"
-    # model = "taba-moe-piecewiselinear"
+    # model = "taba-piecewiselinear"
+    model = "taba-moe-piecewiselinear"
 
     tgt = load_target_single(model)
+    print(tgt.shape)
     bench = load_benchmark("output/paper_metrics.json")
     print(tgt)
 
@@ -296,12 +316,13 @@ if __name__ == "__main__":
         ranks_pivot = pivot_rank(rank)
         avg_ranked = ranks_pivot.mean(axis=1).sort_values()
         mean_std_table = pivot_mean_std(bench, tgt, bench_models, use_std=False)
+        mean_std_table = add_arrow(mean_std_table, direction_map)
 
         print(ranks_pivot)
         print(mean_std_table)
 
         print("\nDataset directions:")
-        print_directions_one_line(direction_map, mean_std_table.columns)
+        # print_directions_one_line(direction_map, mean_std_table.columns)
         print()
 
         print(avg_ranked)
@@ -309,6 +330,7 @@ if __name__ == "__main__":
         
         mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
         avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 
+
 
     # tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
     # ranks_pivot = pivot_rank(tabm_bench)

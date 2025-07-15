@@ -1,0 +1,77 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 4,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-1-pol",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.001903338449795272,
+            "weight_decay": 0.0037919336874827378
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 9,
+                "d_block": 240,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 119
+        }
+    },
+    "n_parameters": 1028960,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 520,
+    "metrics": {
+        "train": {
+            "rmse": 1.0738743455361108,
+            "mae": 0.5164356231689453,
+            "r2": 0.9993320510564716,
+            "score": -1.0738743455361108
+        },
+        "val": {
+            "rmse": 2.387959209438805,
+            "mae": 1.007692575454712,
+            "r2": 0.9968257011149724,
+            "score": -2.387959209438805
+        },
+        "test": {
+            "rmse": 2.3404549387941915,
+            "mae": 0.9902985692024231,
+            "r2": 0.9968809562173048,
+            "score": -2.3404549387941915
+        }
+    },
+    "time": "0:00:34.021735",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        11,
+        26,
+        0,
+        14,
+        25
+    ],
+    "head_selection_time": "0:00:00.116660"
+}
