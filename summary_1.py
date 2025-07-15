@@ -271,10 +271,10 @@ if __name__ == "__main__":
     # model = "taba-piecewiselinear"
     # model = "tabrmv4-mini-periodic"
     # model = "tabrmoev4-drop-periodic"
-    # model = "taba-k128-piecewiselinear"
+    model = "taba-k128-piecewiselinear"
     # model = "taba-piecewiselinear"
     # model = "tabpln-mini-piecewiselinear"
-    model = "taba-piecewiselinear"
+    # model = "taba-piecewiselinear"
     # model = "taba-moe-piecewiselinear"
 
     tgt = load_target_single(model)
