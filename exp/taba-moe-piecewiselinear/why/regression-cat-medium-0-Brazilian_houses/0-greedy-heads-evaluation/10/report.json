@@ -1,0 +1,74 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 10,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0014186187661352815,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 288,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 26
+        }
+    },
+    "n_parameters": 349792,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 2940,
+    "metrics": {
+        "train": {
+            "rmse": 0.013351644241957217,
+            "mae": 0.010387979447841644,
+            "r2": 0.9997230947569843,
+            "score": -0.013351644241957217
+        },
+        "val": {
+            "rmse": 0.05352014553858239,
+            "mae": 0.013924009166657925,
+            "r2": 0.9955612782201604,
+            "score": -0.05352014553858239
+        },
+        "test": {
+            "rmse": 0.02191703299204279,
+            "mae": 0.012332536280155182,
+            "r2": 0.9992140856303748,
+            "score": -0.02191703299204279
+        }
+    },
+    "time": "0:00:45.250175",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        14
+    ],
+    "head_selection_time": "0:00:00.063495"
+}

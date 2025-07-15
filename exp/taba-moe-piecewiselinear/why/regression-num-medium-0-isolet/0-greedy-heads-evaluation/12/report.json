@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 12,
+        "batch_size": 128,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-isolet",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0029900698121945028,
+            "weight_decay": 0.07835732343873261
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 10,
+                "d_block": 432,
+                "dropout": 0.17043516955653903
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 20
+            }
+        },
+        "bins": {
+            "n_bins": 47
+        }
+    },
+    "n_parameters": 8482080,
+    "prediction_type": "labels",
+    "epoch_size": 43,
+    "best_step": 1548,
+    "metrics": {
+        "train": {
+            "rmse": 0.3189026462401776,
+            "mae": 0.20410339534282684,
+            "r2": 0.9981870339122975,
+            "score": -0.3189026462401776
+        },
+        "val": {
+            "rmse": 2.0636830260455516,
+            "mae": 0.6279569268226624,
+            "r2": 0.9248531039443024,
+            "score": -2.0636830260455516
+        },
+        "test": {
+            "rmse": 2.1424633958643047,
+            "mae": 0.6448033452033997,
+            "r2": 0.9189085318823733,
+            "score": -2.1424633958643047
+        }
+    },
+    "time": "0:03:24.983228",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        13,
+        9,
+        26,
+        9
+    ],
+    "head_selection_time": "0:00:00.092835"
+}

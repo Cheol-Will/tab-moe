@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-Brazilian_houses",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0014186187661352815,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 3,
+                "d_block": 288,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 26
+        }
+    },
+    "n_parameters": 349792,
+    "prediction_type": "labels",
+    "epoch_size": 30,
+    "best_step": 3120,
+    "metrics": {
+        "train": {
+            "rmse": 0.008474789345543137,
+            "mae": 0.005125006195157766,
+            "r2": 0.9998884371760363,
+            "score": -0.008474789345543137
+        },
+        "val": {
+            "rmse": 0.01663109750207603,
+            "mae": 0.007134146522730589,
+            "r2": 0.9995713872017917,
+            "score": -0.01663109750207603
+        },
+        "test": {
+            "rmse": 0.030351165039511352,
+            "mae": 0.00791640393435955,
+            "r2": 0.9984928293694613,
+            "score": -0.030351165039511352
+        }
+    },
+    "time": "0:00:48.293615",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        4,
+        11,
+        22
+    ],
+    "head_selection_time": "0:00:00.107184"
+}

@@ -291,23 +291,21 @@ if __name__ == "__main__":
     # model = "taba-k128-piecewiselinear"
     # model = "taba-piecewiselinear"
     # model = "tabpln-mini-piecewiselinear"
-    # model = "taba-piecewiselinear"
-    model = "taba-moe-piecewiselinear"
+    model = "taba-piecewiselinear"
+    # model = "taba-moe-piecewiselinear"
 
     tgt = load_target_single(model)
     print(tgt.shape)
     bench = load_benchmark("output/paper_metrics.json")
     print(tgt)
 
-    # additional model
-    # need to merge this model
     tgt = merge_tag(tgt, 'tabm-piecewiselinear')
     tgt = merge_tag(tgt, 'tabm-mini-piecewiselinear')
     tgt = merge_tag(tgt, 'tabm')
 
 
 
-    # print(bench)
+    # # print(bench)
     ranks, clf_rank, reg_rank = merge_and_rank(bench, tgt, direction_map, bench_models)
     # rank_list = [clf_rank, reg_rank, ranks]
     rank_list = [ranks]
@@ -331,6 +329,16 @@ if __name__ == "__main__":
         mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
         avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 
 
+    model_list = [
+        'taba-k128-piecewiselinear',
+        'taba-piecewiselinear',
+        'taba-piecewiselinear',
+        'taba-moe-piecewiselinear'
+    ]
+
+    # just merge_mean_std_table
+    # note that mean_std_tables contain duplicated rows 
+    # 
 
     # tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
     # ranks_pivot = pivot_rank(tabm_bench)
