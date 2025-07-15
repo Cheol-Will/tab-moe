@@ -1,0 +1,73 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 8,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00011546030581026548,
+            "weight_decay": 0.021327157363685574
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 208,
+                "dropout": 0.31164791667659336
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 49
+        }
+    },
+    "n_parameters": 124464,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 800,
+    "metrics": {
+        "train": {
+            "rmse": 0.8176892434258825,
+            "mae": 0.6017261147499084,
+            "r2": 0.227711726553119,
+            "score": -0.8176892434258825
+        },
+        "val": {
+            "rmse": 0.8456185807395373,
+            "mae": 0.6259564757347107,
+            "r2": 0.1519631345737712,
+            "score": -0.8456185807395373
+        },
+        "test": {
+            "rmse": 0.8625172475113098,
+            "mae": 0.6350180506706238,
+            "r2": 0.1474256270043971,
+            "score": -0.8625172475113098
+        }
+    },
+    "time": "0:00:19.775348",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        12
+    ],
+    "head_selection_time": "0:00:00.040374"
+}

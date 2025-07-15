@@ -1,0 +1,75 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 6,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0011782419642695386,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 5,
+                "d_block": 432,
+                "dropout": 0.16515201516528424
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 87
+        }
+    },
+    "n_parameters": 7533200,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 814,
+    "metrics": {
+        "train": {
+            "rmse": 0.052804738802686685,
+            "mae": 0.04014212638139725,
+            "r2": 0.9821860742232337,
+            "score": -0.052804738802686685
+        },
+        "val": {
+            "rmse": 0.24701327393024813,
+            "mae": 0.12991024553775787,
+            "r2": 0.5924397388653795,
+            "score": -0.24701327393024813
+        },
+        "test": {
+            "rmse": 0.25688977275609803,
+            "mae": 0.15910175442695618,
+            "r2": 0.5490450040867827,
+            "score": -0.25688977275609803
+        }
+    },
+    "time": "0:02:06.042954",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        15,
+        14
+    ],
+    "head_selection_time": "0:00:00.079155"
+}

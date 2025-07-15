@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 12,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.00011546030581026548,
+            "weight_decay": 0.021327157363685574
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 1,
+                "d_block": 208,
+                "dropout": 0.31164791667659336
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 8
+            }
+        },
+        "bins": {
+            "n_bins": 49
+        }
+    },
+    "n_parameters": 124464,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 720,
+    "metrics": {
+        "train": {
+            "rmse": 0.8207020515823426,
+            "mae": 0.6036434769630432,
+            "r2": 0.22201016986015465,
+            "score": -0.8207020515823426
+        },
+        "val": {
+            "rmse": 0.8455962362423107,
+            "mae": 0.625825047492981,
+            "r2": 0.15200792267696017,
+            "score": -0.8455962362423107
+        },
+        "test": {
+            "rmse": 0.8630624554269644,
+            "mae": 0.6351717710494995,
+            "r2": 0.14634744737770455,
+            "score": -0.8630624554269644
+        }
+    },
+    "time": "0:00:18.833899",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        20,
+        10,
+        27,
+        15
+    ],
+    "head_selection_time": "0:00:00.156346"
+}

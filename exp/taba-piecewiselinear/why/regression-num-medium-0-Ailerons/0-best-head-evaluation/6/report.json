@@ -1,0 +1,73 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 6,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-Ailerons",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0024405099879351824,
+            "weight_decay": 0.0994522713083619
+        },
+        "model": {
+            "arch_type": "taba",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 2,
+                "d_block": 896,
+                "dropout": 0.07241432513727032
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 12
+            }
+        },
+        "bins": {
+            "n_bins": 52
+        }
+    },
+    "n_parameters": 503196,
+    "prediction_type": "labels",
+    "epoch_size": 38,
+    "best_step": 798,
+    "metrics": {
+        "train": {
+            "rmse": 0.00013371670061156484,
+            "mae": 9.80013792286627e-05,
+            "r2": 0.8949458800483997,
+            "score": -0.00013371670061156484
+        },
+        "val": {
+            "rmse": 0.00014692675510623272,
+            "mae": 0.00010692408250179142,
+            "r2": 0.8540090934007122,
+            "score": -0.00014692675510623272
+        },
+        "test": {
+            "rmse": 0.00015138397607117446,
+            "mae": 0.00010906700481427833,
+            "r2": 0.8576263682859292,
+            "score": -0.00015138397607117446
+        }
+    },
+    "time": "0:00:16.929485",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        24
+    ],
+    "head_selection_time": "0:00:00.030833"
+}

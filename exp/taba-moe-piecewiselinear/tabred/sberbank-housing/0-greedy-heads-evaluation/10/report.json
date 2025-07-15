@@ -1,0 +1,76 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 10,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/sberbank-housing",
+            "num_policy": "noisy-quantile",
+            "cat_policy": "ordinal"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0011782419642695386,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 5,
+                "d_block": 432,
+                "dropout": 0.16515201516528424
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 32
+            }
+        },
+        "bins": {
+            "n_bins": 87
+        }
+    },
+    "n_parameters": 7533200,
+    "prediction_type": "labels",
+    "epoch_size": 74,
+    "best_step": 74,
+    "metrics": {
+        "train": {
+            "rmse": 0.25398030301563895,
+            "mae": 0.12608687579631805,
+            "r2": 0.5878892706916073,
+            "score": -0.25398030301563895
+        },
+        "val": {
+            "rmse": 0.2426556400406854,
+            "mae": 0.13326670229434967,
+            "r2": 0.6066926708641615,
+            "score": -0.2426556400406854
+        },
+        "test": {
+            "rmse": 0.240497468308013,
+            "mae": 0.14994560182094574,
+            "r2": 0.6047602685047008,
+            "score": -0.240497468308013
+        }
+    },
+    "time": "0:01:19.696415",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        1,
+        10,
+        20
+    ],
+    "head_selection_time": "0:00:00.080104"
+}

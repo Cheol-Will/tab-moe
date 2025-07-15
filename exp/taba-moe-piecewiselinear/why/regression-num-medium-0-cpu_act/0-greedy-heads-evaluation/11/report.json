@@ -1,0 +1,79 @@
+{
+    "function": "bin.model.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 11,
+        "batch_size": 128,
+        "patience": 16,
+        "n_epochs": -1,
+        "gradient_clipping_norm": 1.0,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-num-medium-0-cpu_act",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0008045559242296371,
+            "weight_decay": 0.0576628395648822
+        },
+        "model": {
+            "arch_type": "taba-moe",
+            "k": 32,
+            "share_training_batches": false,
+            "backbone": {
+                "type": "MLP",
+                "n_blocks": 4,
+                "d_block": 80,
+                "dropout": 0.0
+            },
+            "num_embeddings": {
+                "type": "PiecewiseLinearEmbeddingsV2",
+                "d_embedding": 16
+            }
+        },
+        "bins": {
+            "n_bins": 120
+        }
+    },
+    "n_parameters": 133360,
+    "prediction_type": "labels",
+    "epoch_size": 45,
+    "best_step": 720,
+    "metrics": {
+        "train": {
+            "rmse": 1.991681681726697,
+            "mae": 1.4660884141921997,
+            "r2": 0.98808834770385,
+            "score": -1.991681681726697
+        },
+        "val": {
+            "rmse": 2.2861363583243537,
+            "mae": 1.629654884338379,
+            "r2": 0.9845622936216012,
+            "score": -2.2861363583243537
+        },
+        "test": {
+            "rmse": 2.269911506037021,
+            "mae": 1.6613285541534424,
+            "r2": 0.9855719416735582,
+            "score": -2.269911506037021
+        }
+    },
+    "time": "0:00:23.344818",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        16,
+        18,
+        10,
+        1,
+        18,
+        10,
+        7
+    ],
+    "head_selection_time": "0:00:00.191858"
+}

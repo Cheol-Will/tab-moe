@@ -111,7 +111,9 @@ def merge_and_rank(
             mname = sg.loc[i,'method']
             mmean = sg.loc[i,'mean']
             mstd  = sg.loc[i,'std']
-
+            if pd.isna(mmean) or pd.isna(mstd):
+                print(f"[WARN] NaN found in first row of group: {sg[['method', 'mean', 'std']]}")
+                mstd = 0
             if direction == 'higher_is_better':
                 same_tier = (mmean >= ref_mean - ref_std)
             else:
@@ -276,6 +278,7 @@ if __name__ == "__main__":
     # model = "taba-moe-piecewiselinear"
 
     tgt = load_target_single(model)
+    print(tgt.shape)
     bench = load_benchmark("output/paper_metrics.json")
     print(tgt)
 
