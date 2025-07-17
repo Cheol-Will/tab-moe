@@ -639,7 +639,6 @@ class ModelTabRM(nn.Module):
         return x        
 
 
-
 class Config(TypedDict):
     seed: int
     data: KWArgs

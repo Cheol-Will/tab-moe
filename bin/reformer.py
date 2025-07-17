@@ -63,6 +63,7 @@ class Model(nn.Module):
         activation: str,
         queue_size: int, 
         is_classification: bool,
+        num_heads: int = 1,
         context_size: int = 96, # Need to check
         # Below options are used only if it's needed.
         candidate_encoding_batch_size: None | int = None,
@@ -132,7 +133,7 @@ class Model(nn.Module):
 
         d_out = 1 if n_classes is None else n_classes
         self.blocks1 = nn.ModuleList(
-            [lib.reformer.Transformer(dim=d_main) for _ in range(predictor_n_blocks)]
+            [lib.reformer.Transformer(dim=d_main, num_heads=num_heads) for _ in range(predictor_n_blocks)]
         )
         if multi_output_head: 
             self.head = nn.ModuleList([
@@ -191,11 +192,21 @@ class Model(nn.Module):
     def _dequeue_and_enqueue(self, keys, labels) -> None:
         batch_size = keys.shape[0]
         ptr = int(self.queue_ptr)
-        assert self.queue_size % batch_size == 0
-        self.queue[ptr : ptr + batch_size, :] = keys # update memory queue
-        self.queue_label[ptr : ptr + batch_size] = labels # update memory label queue
-        ptr = (ptr + batch_size) % self.queue_size # adjust pointer
 
+        # print(f"Current batch size: {batch_size}")
+        # print(f"Queue pointer: {ptr}")
+
+        if ptr + batch_size > self.queue_size:
+            overflow = (ptr + batch_size) - self.queue_size
+            self.queue[ptr:self.queue_size, :]  = keys[:self.queue_size - ptr, :]
+            self.queue[0:overflow, :] = keys[self.queue_size - ptr:, :]
+            self.queue_label[ptr:self.queue_size]  = labels[:self.queue_size - ptr]
+            self.queue_label[0:overflow] = labels[self.queue_size - ptr:]
+        else:
+            self.queue[ptr:ptr + batch_size, :] = keys
+            self.queue_label[ptr:ptr + batch_size] = labels
+            
+        ptr = (ptr + batch_size) % self.queue_size # adjust pointer
         self.queue_ptr[0] = ptr
 
     @torch.no_grad()
@@ -455,7 +466,11 @@ def main(
         "n_classes": dataset.task.try_compute_n_classes(),
         "bins": bin_edges,
     }
+    # below k is not used. 
+    # if adapter is used, then need to specify k correctly. 
     config['model']['k'] = 1 + config['model']['predictor_n_blocks']
+
+
     model_args = config['model'].copy()
     model_args.pop('arch_type', None)
     model_args.pop('share_training_batches', None)
@@ -465,7 +480,6 @@ def main(
     queue_size_ = min(dataset.size('train'), queue_ratio * batch_size)
     queue_size = (queue_size_ // batch_size) * batch_size
     model_args['queue_size'] = queue_size
-
     print(f"Init with {model_args}" )
 
     model = Model(
