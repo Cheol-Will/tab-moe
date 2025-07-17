@@ -24,9 +24,11 @@ class MLP(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        for p in self.parameters():
-            if p.dim() > 1:
-                nn.init.xavier_uniform_(p)
+       for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.xavier_uniform_(module.weight)
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, x):
         x = self.drop1(self.act(self.fc1(x)))
@@ -36,7 +38,7 @@ class MLP(nn.Module):
 
 class Attention(nn.Module):
     """
-        Single head attention module
+        Multihead attention module
     """
     def __init__(
         self,
@@ -100,7 +102,7 @@ class Attention(nn.Module):
         v = v.reshape(B, N, self.num_heads, self.head_dim).permute(0, 2, 1, 3) # (B, H, N, D_H)
 
         q, k = self.q_norm(q), self.k_norm(k)
-        q = q * self.scale
+        q = q * self.scale # d**-0.5
 
         attn = torch.einsum('bhsd,bhnd->bhsn', q, k) # (B, H, S, N)
         attn = attn.softmax(dim=-1) # (B, H, S, N)
@@ -141,9 +143,9 @@ class Transformer(nn.Module):
             attn_drop=attn_drop,
             proj_drop=proj_drop,
             normalization=normalization,
-            q_proj=False,
-            k_proj=False,
-            v_proj=False,
+            q_proj=False if num_heads == 1 else True,
+            k_proj=False if num_heads == 1 else True,
+            v_proj=False if num_heads == 1 else True,
         )
         self.mlp = MLP(
             dim=dim,
