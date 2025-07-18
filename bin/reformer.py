@@ -41,6 +41,33 @@ if __name__ == '__main__':
     del _project_dir
 # <<<
 
+@torch.inference_mode()
+def _init_first_adapter(
+    weight: Tensor,
+    distribution: Literal['normal', 'random-signs'],
+    init_sections: list[int],
+) -> None:
+    """Initialize the first adapter.
+    """
+    assert weight.ndim == 2
+    assert weight.shape[1] == sum(init_sections)
+
+    if distribution == 'normal':
+        init_fn_ = nn.init.normal_
+    elif distribution == 'random-signs':
+        init_fn_ = lib.deep.init_random_signs_
+    else:
+        raise ValueError(f'Unknown distribution: {distribution}')
+
+    section_bounds = [0, *torch.tensor(init_sections).cumsum(0).tolist()]
+    for i in range(len(init_sections)):
+        w = torch.empty((len(weight), 1), dtype=weight.dtype, device=weight.device)
+        init_fn_(w)
+        weight[:, section_bounds[i] : section_bounds[i + 1]] = w
+
+
+
+
 class Model(nn.Module):
     def __init__(
         self,
@@ -64,11 +91,13 @@ class Model(nn.Module):
         queue_size: int, 
         is_classification: bool,
         num_heads: int = 1,
+        predictor_type: str = 'mha',
         context_size: int = 96, # Need to check
-        # Below options are used only if it's needed.
-        candidate_encoding_batch_size: None | int = None,
         use_aux_loss: bool = False,
         multi_output_head: bool = False,
+        use_adapter: bool = False,
+        k: int = None,
+        candidate_encoding_batch_size: None | int = None,
     ):
         if mixer_normalization == 'auto':
             mixer_normalization = encoder_n_blocks > 0
@@ -132,8 +161,16 @@ class Model(nn.Module):
         )
 
         d_out = 1 if n_classes is None else n_classes
+
+        if use_adapter:
+            self.adapter = lib.reformer.Adapter(
+                k, d_main
+            )
+        else:
+            self.adapter = None
+
         self.blocks1 = nn.ModuleList(
-            [lib.reformer.Transformer(dim=d_main, num_heads=num_heads) for _ in range(predictor_n_blocks)]
+            [lib.reformer.Transformer(dim=d_main, num_heads=num_heads, attention_type=predictor_type) for _ in range(predictor_n_blocks)]
         )
         if multi_output_head: 
             self.head = nn.ModuleList([
@@ -350,11 +387,14 @@ class Model(nn.Module):
                 candidate_idx
             )
 
-        context_y = self.label_encoder(context_y.unsqueeze(-1)) # (B, K, D)
+        context_y = self.label_encoder(context_y.unsqueeze(-1)) # (B, M, D)
         
         if self.use_aux_loss:
             out = self.head(query) if not self.multi_output_head else self.head[0](query)
             outs = [out[:, None]]
+
+        if self.adapter is not None:
+            query = self.adapter(query) # (B, K, D)
 
         for idx, block in enumerate(self.blocks1):
             query = block(query, context_k, context_y) # update query
@@ -468,13 +508,11 @@ def main(
     }
     # below k is not used. 
     # if adapter is used, then need to specify k correctly. 
-    config['model']['k'] = 1 + config['model']['predictor_n_blocks']
 
 
     model_args = config['model'].copy()
     model_args.pop('arch_type', None)
     model_args.pop('share_training_batches', None)
-    model_args.pop('k', None)
 
     queue_ratio = model_args.pop('queue_ratio', None)
     queue_size_ = min(dataset.size('train'), queue_ratio * batch_size)
@@ -627,8 +665,6 @@ def main(
             is_train=is_train,
         )
         return pred.squeeze(-1).float()
-
-
 
 
     @evaluation_mode()

@@ -295,8 +295,11 @@ class BaseEncoder(nn.Module):
         self.reset_parameters()
 
     def reset_parameters(self):
-        
-        pass
+        for module in self.modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_uniform_(module.weight, a=0, nonlinearity='relu')
+                if module.bias is not None:
+                    nn.init.zeros_(module.bias)
 
     def forward(self, x):
         x = self.linear(x) # d_in -> d_main
@@ -306,3 +309,24 @@ class BaseEncoder(nn.Module):
             else: 
                 x = block(x)
         return x
+
+
+class Adapter(nn.Module):
+    def __init__(
+        self,
+        k: int,
+        d: int,
+    ):
+        super().__init__()
+        self.weight = nn.Parameter(torch.empty(1, k, d))
+        self.reset_parameters()
+
+    def reset_parameters(self):
+        nn.init.normal_(self.weight, mean=1)
+
+    def forward(self, x):
+        if x.ndim == 2:
+            x = x.unsqueeze(1)
+        assert x.ndim == 3
+        
+        return x * self.weight

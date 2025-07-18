@@ -51,29 +51,13 @@ def load_target_single(model: str, report_type: str = 'evaluation') -> pd.DataFr
     return df_agg
 
 
-def pivot_target_single(df: pd.DataFrame, direction_map: dict[str,str]) -> pd.DataFrame:
-    df['direction'] = df['dataset'].map(direction_map)
-    def adjust(row):
-        if pd.isna(row['mean']) or pd.isna(row['std']):
-            return np.nan
-        if row['direction']=='higher_is_better':
-            return row['mean'] - row['std']
-        else:
-            return -(row['mean'] + row['std'])
-
-    df['adj_score'] = df.apply(adjust, axis=1)
-    pivot = df.pivot(index='dataset', columns='method', values='adj_score').reset_index()
-    dirs = df[['dataset','direction']].drop_duplicates()
-    pivot = pivot.merge(dirs, on='dataset', how='left')
-    cols = ['dataset','direction'] + [c for c in pivot.columns if c not in ('dataset','direction')]
-    return pivot[cols]
-
 def merge_and_rank(
     bench_long: pd.DataFrame,
     tgt_long: pd.DataFrame,
     direction_map: dict[str,str],
     bench_models: list[str] = None,           
 ) -> pd.DataFrame:
+    print(tgt_long.isna().sum())
     if tgt_long is not None:
         tgt = tgt_long.copy()
         tgt['direction'] = tgt['dataset'].map(direction_map)
@@ -100,8 +84,7 @@ def merge_and_rank(
     def rank_group(g):
         direction = g['direction'].iat[0]
         ascending = (direction == 'lower_is_better')
-        sg = g.sort_values('mean', ascending=ascending).reset_index(drop=True)
-
+        sg = g.sort_values('mean', ascending=ascending, na_position='last').reset_index(drop=True)
         ranks = {}
         ref_mean, ref_std = sg.loc[0, ['mean','std']]
         curr_rank = 1
@@ -111,8 +94,9 @@ def merge_and_rank(
             mname = sg.loc[i,'method']
             mmean = sg.loc[i,'mean']
             mstd  = sg.loc[i,'std']
-            if pd.isna(mmean) or pd.isna(mstd):
-                print(f"[WARN] NaN found in first row of group: {sg[['method', 'mean', 'std']]}")
+            if pd.isna(mmean): 
+                raise ValueError(f'NAN')
+            if pd.isna(mstd):
                 mstd = 0
             if direction == 'higher_is_better':
                 same_tier = (mmean >= ref_mean - ref_std)
@@ -245,7 +229,6 @@ def add_arrow(mean_std_table, direction_map):
 
     return mean_std_table.rename(columns=rename_map)
 
-
 if __name__ == "__main__":
 
     target_models = [
@@ -272,75 +255,69 @@ if __name__ == "__main__":
         for dataset, info in raw.items()
     }
 
-
     bench_models = [
-        'MLP', 'Excel-plugins', 'SAINT', 'FT-T',
-        'T2G', 'MNCA', 'TabR', 'MLP-piecewiselinear',
-        'LightGBM', 'XGBoost', 'CatBoost',
+        # 'MLP', 
+        'MLP-piecewiselinear',
+        # 'Excel-plugins', 'SAINT', 'FT-T', 'T2G', 
+        # 'MNCA', 'TabR', 
         'MNCA-periodic', 'TabR-periodic',
+        # 'LightGBM', 
+        'XGBoost', 
+        # 'CatBoost',
         # 'TabM', 'TabMmini-piecewiselinear',
     ]
-    # model = 'retransformer-periodic'
-    # model = 'tabr-pln-multihead-periodic'
-    # model = 'tabr-pln-periodic'
-    # model = 'rep-tabr-periodic'
-    # model = "tabm-rankp-piecewiselinear"
-    # model = "taba-piecewiselinear"
-    # model = "tabrmv4-mini-periodic"
-    # model = "tabrmoev4-drop-periodic"
-    # model = "taba-k128-piecewiselinear"
-    # model = "taba-piecewiselinear"
-    # model = "tabpln-mini-piecewiselinear"
-    model = "taba-piecewiselinear"
-    # model = "taba-moe-piecewiselinear"
+    model = "reformer-d1-h1-m32"
 
+    # tgt = load_target_single(model)
+    # print(tgt.shape)
     tgt = load_target_single(model)
-    print(tgt.shape)
     bench = load_benchmark("output/paper_metrics.json")
+    reformer_list = [
+        # 'reformer-d1-h1-m32',
+        'reformer-d1-h1-m32-aux',
+        'reformer-d1-h1-m64',
+        'reformer-d3-h4-m32',
+        'reformer-d3-h4-m32-aux',
+        'reformer-d3-h4-m64',
+        'reformer-d3-h4-m32-mqa',
+        'reformer-d3-h4-m32-adapter',
+        'reformer-d3-h4-m32-mqa-adapter',
+        'reformer-d3-h4-m96',
+        'reformer-d3-h4-m64-mqa',
+        'reformer-d3-h4-m96-mqa',
+        'retransformer-periodic',
+        'tabm-piecewiselinear',
+        'tabm-mini-piecewiselinear',
+        'tabm'
+    ]
+    for model_name in reformer_list:
+        tgt = merge_tag(tgt, model_name)
+
     print(tgt)
-
-    tgt = merge_tag(tgt, 'tabm-piecewiselinear')
-    tgt = merge_tag(tgt, 'tabm-mini-piecewiselinear')
-    tgt = merge_tag(tgt, 'tabm')
-
-
-
     # # print(bench)
     ranks, clf_rank, reg_rank = merge_and_rank(bench, tgt, direction_map, bench_models)
     # rank_list = [clf_rank, reg_rank, ranks]
     rank_list = [ranks]
     for rank in rank_list:
-        print(rank)
         ranks_pivot = pivot_rank(rank)
+        print(ranks_pivot)
+
+        max_rank = ranks_pivot.max().max()  # 
+        ranks_pivot = ranks_pivot.fillna(max_rank + 1)
         avg_ranked = ranks_pivot.mean(axis=1).sort_values()
         mean_std_table = pivot_mean_std(bench, tgt, bench_models, use_std=False)
         mean_std_table = add_arrow(mean_std_table, direction_map)
 
-        print(ranks_pivot)
+        ranks_pivot = add_arrow(ranks_pivot, direction_map)
+
         print(mean_std_table)
 
         print("\nDataset directions:")
-        # print_directions_one_line(direction_map, mean_std_table.columns)
         print()
 
         print(avg_ranked)
         print()
-        
+
+        ranks_pivot.to_csv(f"output/ranks_for_ppt_250711_{model}.csv") 
         mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
         avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 
-
-    model_list = [
-        'taba-k128-piecewiselinear',
-        'taba-piecewiselinear',
-        'taba-piecewiselinear',
-        'taba-moe-piecewiselinear'
-    ]
-
-    # just merge_mean_std_table
-    # note that mean_std_tables contain duplicated rows 
-    # 
-
-    # tabm_bench, _, _ = merge_and_rank(bench, None, direction_map, bench_models)
-    # ranks_pivot = pivot_rank(tabm_bench)
-    # avg_ranked = ranks_pivot.mean(axis=1).sort_values()
-    # print(avg_ranked)
