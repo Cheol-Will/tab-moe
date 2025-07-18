@@ -1,0 +1,246 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.reformer.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/churn",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "predictor_n_blocks": 3,
+                "context_size": 64,
+                "encoder_n_blocks": 1,
+                "num_heads": 4,
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": [
+                    "_tune_",
+                    "int-power-of-two",
+                    6,
+                    9
+                ],
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        16,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        16,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.reformer.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/churn",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 0.0003191602395844253,
+                "weight_decay": 2.4155430714331143e-06
+            },
+            "model": {
+                "predictor_n_blocks": 3,
+                "context_size": 64,
+                "encoder_n_blocks": 1,
+                "num_heads": 4,
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": 64,
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": 0.21579357514816902,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 68,
+                    "frequency_init_scale": 0.04224085332212611,
+                    "d_embedding": 47,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 145669,
+        "prediction_type": "probs",
+        "epoch_size": 25,
+        "best_step": 1225,
+        "metrics": {
+            "train": {
+                "0": {
+                    "precision": 0.8860714285714286,
+                    "recall": 0.9737048665620094,
+                    "f1-score": 0.9278234854151084,
+                    "support": 5096.0
+                },
+                "1": {
+                    "precision": 0.8325,
+                    "recall": 0.5107361963190185,
+                    "f1-score": 0.6330798479087453,
+                    "support": 1304.0
+                },
+                "accuracy": 0.879375,
+                "macro avg": {
+                    "precision": 0.8592857142857143,
+                    "recall": 0.7422205314405139,
+                    "f1-score": 0.7804516666619268,
+                    "support": 6400.0
+                },
+                "weighted avg": {
+                    "precision": 0.87515625,
+                    "recall": 0.879375,
+                    "f1-score": 0.867769469273187,
+                    "support": 6400.0
+                },
+                "cross-entropy": 0.30106593997012693,
+                "roc-auc": 0.8958228244695707,
+                "score": 0.879375
+            },
+            "val": {
+                "0": {
+                    "precision": 0.8803418803418803,
+                    "recall": 0.9701726844583988,
+                    "f1-score": 0.9230769230769231,
+                    "support": 1274.0
+                },
+                "1": {
+                    "precision": 0.8061224489795918,
+                    "recall": 0.48466257668711654,
+                    "f1-score": 0.6053639846743295,
+                    "support": 326.0
+                },
+                "accuracy": 0.87125,
+                "macro avg": {
+                    "precision": 0.8432321646607361,
+                    "recall": 0.7274176305727577,
+                    "f1-score": 0.7642204538756263,
+                    "support": 1600.0
+                },
+                "weighted avg": {
+                    "precision": 0.865219671201814,
+                    "recall": 0.87125,
+                    "f1-score": 0.8583429118773946,
+                    "support": 1600.0
+                },
+                "cross-entropy": 0.3393501695678654,
+                "roc-auc": 0.8600165172251062,
+                "score": 0.87125
+            },
+            "test": {
+                "0": {
+                    "precision": 0.8754266211604096,
+                    "recall": 0.9661016949152542,
+                    "f1-score": 0.9185317815577441,
+                    "support": 1593.0
+                },
+                "1": {
+                    "precision": 0.7768595041322314,
+                    "recall": 0.4619164619164619,
+                    "f1-score": 0.5793528505392913,
+                    "support": 407.0
+                },
+                "accuracy": 0.8635,
+                "macro avg": {
+                    "precision": 0.8261430626463204,
+                    "recall": 0.714009078415858,
+                    "f1-score": 0.7489423160485177,
+                    "support": 2000.0
+                },
+                "weighted avg": {
+                    "precision": 0.8553682128451753,
+                    "recall": 0.8635,
+                    "f1-score": 0.8495088690954888,
+                    "support": 2000.0
+                },
+                "cross-entropy": 0.3477326663331841,
+                "roc-auc": 0.853664141799735,
+                "score": 0.8635
+            }
+        },
+        "time": "0:00:47.314379",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 40,
+        "tuning_time": "0:18:23.450509"
+    },
+    "time": "0:47:46.676232",
+    "n_completed_trials": 100
+}

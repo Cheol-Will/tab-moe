@@ -1,0 +1,43 @@
+seed = 13
+batch_size = 512
+patience = 16
+n_epochs = -1
+amp = true
+
+[data]
+cache = true
+path = "data/regression-num-medium-0-medical_charges"
+num_policy = "noisy-quantile"
+
+[optimizer]
+type = "AdamW"
+lr = 0.00031646443857750686
+weight_decay = 0.0
+
+[model]
+predictor_type = "mqa"
+predictor_n_blocks = 3
+k = 1
+use_adapter = false
+context_size = 64
+encoder_n_blocks = 1
+num_heads = 4
+momentum = 0.999
+use_aux_loss = false
+multi_output_head = false
+queue_ratio = 64
+arch_type = "retransformer"
+d_main = 16
+d_multiplier = 2.0
+mixer_normalization = "auto"
+dropout0 = 0.0
+dropout1 = 0.0
+normalization = "LayerNorm"
+activation = "ReLU"
+
+[model.num_embeddings]
+type = "PeriodicEmbeddings"
+n_frequencies = 58
+frequency_init_scale = 0.051899171669106244
+d_embedding = 35
+lite = true

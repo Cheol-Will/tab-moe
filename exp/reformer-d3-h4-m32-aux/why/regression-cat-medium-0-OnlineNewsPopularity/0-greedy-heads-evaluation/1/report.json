@@ -1,0 +1,79 @@
+{
+    "function": "bin.reformer.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 1,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 0.0001222098559576258,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "predictor_n_blocks": 3,
+            "context_size": 32,
+            "encoder_n_blocks": 1,
+            "num_heads": 4,
+            "momentum": 0.999,
+            "use_aux_loss": true,
+            "multi_output_head": false,
+            "queue_ratio": 64,
+            "arch_type": "retransformer",
+            "d_main": 128,
+            "d_multiplier": 2.0,
+            "mixer_normalization": "auto",
+            "dropout0": 0.0,
+            "dropout1": 0.0,
+            "normalization": "LayerNorm",
+            "activation": "ReLU",
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 65,
+                "frequency_init_scale": 0.06494757035469254,
+                "d_embedding": 38,
+                "lite": true
+            }
+        }
+    },
+    "n_parameters": 693856,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 600,
+    "metrics": {
+        "train": {
+            "rmse": 0.8190323059035636,
+            "mae": 0.6023943424224854,
+            "r2": 0.22517267723314327,
+            "score": -0.8190323059035636
+        },
+        "val": {
+            "rmse": 0.8478583521242662,
+            "mae": 0.6271018981933594,
+            "r2": 0.147464845299617,
+            "score": -0.8478583521242662
+        },
+        "test": {
+            "rmse": 0.8665897955793069,
+            "mae": 0.6365712881088257,
+            "r2": 0.139355404075038,
+            "score": -0.8665897955793069
+        }
+    },
+    "time": "0:00:45.457793",
+    "chunk_size": null,
+    "eval_batch_size": 32768,
+    "heads": [
+        1
+    ],
+    "head_selection_time": "0:00:00.008207"
+}
