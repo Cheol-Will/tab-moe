@@ -65,7 +65,16 @@ def _init_first_adapter(
         init_fn_(w)
         weight[:, section_bounds[i] : section_bounds[i + 1]] = w
 
+def compute_label_bins(y: Tensor, n_bins: int):
+    bins = [
+        q.unique()
+        for q in torch.quantile(
+            y, torch.linspace(0.0, 1.0, n_bins + 1).to(y), dim=0
+        )
+    ]
+    rtdl_num_embeddings._check_bins(bins)
 
+    return bins
 
 
 class Model(nn.Module):
@@ -78,6 +87,7 @@ class Model(nn.Module):
         bins: None | list[Tensor],
         #
         num_embeddings: None | dict = None,
+        label_bins: None | list[Tensor] = None,
         momentum: float, # momentum
         d_main: int,
         d_multiplier: float,
@@ -152,13 +162,25 @@ class Model(nn.Module):
         self.queue = F.normalize(self.queue, dim=-1)
 
         # >>> Retreival
-        self.label_encoder = (
-            nn.Linear(1, d_main)
-            if n_classes is None
-            else nn.Sequential(
+        if n_classes is None:
+            if label_bins is not None:
+                # using label_bins, apply piecewise linear embedding
+                self.label_encoder = nn.Linear(1, d_main)
+                pass
+            else:
+                self.label_encoder = nn.Linear(1, d_main)
+        else:
+            self.label_encoder = nn.Sequential(
                 nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) # (B, 1, d_main) -> (B, d_main)
             )
-        )
+
+        # self.label_encoder = (
+        #     nn.Linear(1, d_main)
+        #     if n_classes is None
+        #     else nn.Sequential(
+        #         nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) # (B, 1, d_main) -> (B, d_main)
+        #     )
+        # )
 
         d_out = 1 if n_classes is None else n_classes
 
@@ -410,6 +432,7 @@ class Config(TypedDict):
     seed: int
     data: KWArgs
     bins: NotRequired[KWArgs]
+    label_bins: NotRequired[int]
     model: KWArgs
     head_selection: NotRequired[bool]
     optimizer: KWArgs
@@ -445,9 +468,11 @@ def main(
     batch_size = config['batch_size']
     dataset = lib.data.build_dataset(**config['data'])
     if dataset.task.is_regression:
+        print("Standardize labels for regression task")
         dataset.data['y'], regression_label_stats = lib.data.standardize_labels(
             dataset.data['y']
         )
+        print(dataset.data['y'])
     else:
         regression_label_stats = None
 
@@ -498,6 +523,16 @@ def main(
         logger.info(f'Bin counts: {[len(x) - 1 for x in bin_edges]}')
     else:
         bin_edges = None
+
+    # Compute quantiles for label embedding if regressison task.
+    if 'label_bins' in config:
+        if dataset.task.is_regression:
+            label_bins = compute_label_bins(dataset.data['y']['train'], n_bins=config['label_bins'])
+        else:
+            print("Skip computing labels bins since current taks is classification.")
+        
+
+
 
     # branching for custom model
     meta_data = {

@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 
 arch_list=(
-  "reformer-d3-h4-m96"
+  # "reformer-d3-h4-m128-mqa"
+  "reformer-d1-h1-m32"
 )
 
 data_list=(
+  "house"
   # "churn"
-  "why/regression-num-medium-0-medical_charges"
+  # "why/regression-num-medium-0-medical_charges"
   # "tabred/sberbank-housing"
   # "why/regression-cat-medium-0-OnlineNewsPopularity/"
   # "tabred/ecom-offers"

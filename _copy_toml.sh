@@ -2,8 +2,12 @@
 set -euo pipefail
 
 # src_type="retransformer-periodic"
-src_type="reformer-d3-h4-m32"
-# src_type="reformer-d1-m32-aux"
+
+src_type="reformer-d3-h4-m96-mqa"
+
+
+# src_type="reformer-d3-h4-m32"
+src_type="reformer-d1-h1-m32"
 # src_type="reformer-d1-m64"
 
 # src_type="reformer-d3-h4-m32-mqa"
@@ -12,7 +16,7 @@ src_type="reformer-d3-h4-m32"
 # dest_type="reformer-d3-h4-m32-mqa-adapter"
 # dest_type="reformer-d3-h4-m96"
 # dest_type="reformer-d3-h4-m64-mqa"
-dest_type="reformer-d3-h4-m96-mqa"
+dest_type="reformer-d1-h4-m32"
 
 
 # 1) Copy top-level tuning files if they don't already exist

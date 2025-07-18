@@ -9,7 +9,8 @@ set -euo pipefail
 # DEST_ROOT="reformer-d3-h4-m32-mqa-adapter"
 # DEST_ROOT="reformer-d3-h4-m32-adapter"
 
-dest_type="reformer-d3-h4-m96-mqa"
+dest_type="reformer-d1-h4-m32"
+# dest_type="reformer-d3-h4-m96-mqa"
 
 
 find "exp/${dest_type}" -type f -name "0-tuning.toml" -print0 | while IFS= read -r -d '' file; do
@@ -35,12 +36,12 @@ find "exp/${dest_type}" -type f -name "0-tuning.toml" -print0 | while IFS= read 
   declare -A params=(
     [momentum]=0.999
     [queue_ratio]=64
-    [context_size]=96
+    [context_size]=32
     [use_aux_loss]=false
     [use_adapter]=false
     [multi_output_head]=false
     [encoder_n_blocks]=1
-    [predictor_n_blocks]=3
+    [predictor_n_blocks]=1
     [num_heads]=4
     [predictor_type]="\"mqa\""
     [k]=1

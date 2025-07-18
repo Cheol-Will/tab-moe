@@ -286,6 +286,7 @@ if __name__ == "__main__":
         'reformer-d3-h4-m64-mqa',
         'reformer-d3-h4-m96-mqa',
         'retransformer-periodic',
+        'tabrm-periodic',
         'tabm-piecewiselinear',
         'tabm-mini-piecewiselinear',
         'tabm'
