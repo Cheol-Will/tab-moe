@@ -1,0 +1,170 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.qreformer.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "predictor_n_blocks": 1,
+                "context_size": 32,
+                "encoder_n_blocks": 1,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": [
+                    "_tune_",
+                    "int",
+                    16,
+                    384
+                ],
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        16,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        16,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.qreformer.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 0.0006400720155513882,
+                "weight_decay": 1.0178346869893294e-05
+            },
+            "model": {
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "predictor_n_blocks": 1,
+                "context_size": 32,
+                "encoder_n_blocks": 1,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": 133,
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": 0.596655870454654,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 73,
+                    "frequency_init_scale": 0.05173356766132401,
+                    "d_embedding": 43,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 432813,
+        "prediction_type": "labels",
+        "epoch_size": 40,
+        "best_step": 800,
+        "metrics": {
+            "train": {
+                "rmse": 0.7975637414027431,
+                "mae": 0.5943760275840759,
+                "r2": 0.26526005395349883,
+                "score": -0.7975637414027431
+            },
+            "val": {
+                "rmse": 0.8442723811749423,
+                "mae": 0.6317752003669739,
+                "r2": 0.15466101736462057,
+                "score": -0.8442723811749423
+            },
+            "test": {
+                "rmse": 0.8651293137531959,
+                "mae": 0.6419525146484375,
+                "r2": 0.14225392415892535,
+                "score": -0.8651293137531959
+            }
+        },
+        "time": "0:00:27.908240",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 69,
+        "tuning_time": "0:25:11.525607"
+    },
+    "time": "0:37:00.449170",
+    "n_completed_trials": 100
+}

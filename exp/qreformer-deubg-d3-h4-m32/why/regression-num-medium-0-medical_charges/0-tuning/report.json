@@ -1,0 +1,172 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.qreformer.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 512,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-num-medium-0-medical_charges",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "predictor_n_blocks": 3,
+                "context_size": 32,
+                "encoder_n_blocks": 1,
+                "num_heads": 4,
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": [
+                    "_tune_",
+                    "int-power-of-two",
+                    4,
+                    9
+                ],
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        16,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        16,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.qreformer.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 512,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/regression-num-medium-0-medical_charges",
+                "num_policy": "noisy-quantile"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 0.00030637255851247825,
+                "weight_decay": 2.752527934838194e-06
+            },
+            "model": {
+                "predictor_n_blocks": 3,
+                "context_size": 32,
+                "encoder_n_blocks": 1,
+                "num_heads": 4,
+                "momentum": 0.999,
+                "use_aux_loss": false,
+                "multi_output_head": false,
+                "queue_ratio": 64,
+                "arch_type": "retransformer",
+                "d_main": 32,
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": 0.0,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 45,
+                    "frequency_init_scale": 0.01814078746601987,
+                    "d_embedding": 63,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 41773,
+        "prediction_type": "labels",
+        "epoch_size": 20,
+        "best_step": 2760,
+        "metrics": {
+            "train": {
+                "rmse": 0.07987986713099932,
+                "mae": 0.051478639245033264,
+                "r2": 0.9796275045470964,
+                "score": -0.07987986713099932
+            },
+            "val": {
+                "rmse": 0.08204705789931047,
+                "mae": 0.05137645825743675,
+                "r2": 0.9790352414002088,
+                "score": -0.08204705789931047
+            },
+            "test": {
+                "rmse": 0.08148417951938958,
+                "mae": 0.05109246447682381,
+                "r2": 0.9793714927465038,
+                "score": -0.08148417951938958
+            }
+        },
+        "time": "0:01:33.948360",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 48,
+        "tuning_time": "0:54:40.383747"
+    },
+    "time": "1:40:41.478506",
+    "n_completed_trials": 100
+}

@@ -1,0 +1,74 @@
+seed = 0
+function = "bin.qreformer.main"
+n_trials = 25
+
+
+[space]
+seed = 0
+batch_size = 1024
+patience = 16
+n_epochs = -1
+amp = true
+
+[space.data]
+cache = true
+path = "data/delivery-eta"
+cat_policy = "ordinal"
+
+
+[space.optimizer]
+type = "AdamW"
+lr = [
+    "_tune_",
+    "loguniform",
+    3e-05,
+    0.001,
+]
+weight_decay = [
+    "_tune_",
+    "?loguniform",
+    0.0,
+    1e-06,
+    0.0001,
+]
+
+[space.model]
+predictor_n_blocks = 1
+k = 1
+context_size = 32
+encoder_n_blocks = 1
+predictor_type = "mqa"
+use_adapter = false
+num_heads = 4
+momentum = 0.999
+use_aux_loss = false
+multi_output_head = false
+queue_ratio = 64
+arch_type = "retransformer"
+d_main = [
+    "_tune_",
+    "int-power-of-two",
+    7,
+    10,
+]
+d_multiplier = 2.0
+mixer_normalization = "auto"
+dropout0 = [
+    "_tune_",
+    "?uniform",
+    0.0,
+    0.0,
+    0.6,
+]
+dropout1 = 0.0
+normalization = "LayerNorm"
+activation = "ReLU"
+
+[space.model.num_embeddings]
+type = "LinearReLUEmbeddings"
+d_embedding = [
+    "_tune_",
+    "int",
+    16,
+    64,
+]

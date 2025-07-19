@@ -1,0 +1,78 @@
+{
+    "function": "bin.qreformer.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 9,
+        "batch_size": 256,
+        "patience": 16,
+        "n_epochs": -1,
+        "amp": true,
+        "data": {
+            "cache": true,
+            "path": "data/regression-cat-medium-0-OnlineNewsPopularity",
+            "num_policy": "noisy-quantile"
+        },
+        "optimizer": {
+            "type": "AdamW",
+            "lr": 3.6730476597788615e-05,
+            "weight_decay": 0.0
+        },
+        "model": {
+            "predictor_n_blocks": 3,
+            "k": 1,
+            "context_size": 128,
+            "encoder_n_blocks": 1,
+            "predictor_type": "mqa",
+            "use_adapter": false,
+            "num_heads": 4,
+            "momentum": 0.999,
+            "use_aux_loss": false,
+            "multi_output_head": false,
+            "queue_ratio": 64,
+            "arch_type": "retransformer",
+            "d_main": 64,
+            "d_multiplier": 2.0,
+            "mixer_normalization": "auto",
+            "dropout0": 0.0,
+            "dropout1": 0.0,
+            "normalization": "LayerNorm",
+            "activation": "ReLU",
+            "num_embeddings": {
+                "type": "PeriodicEmbeddings",
+                "n_frequencies": 32,
+                "frequency_init_scale": 0.026838548671459163,
+                "d_embedding": 63,
+                "lite": true
+            }
+        }
+    },
+    "n_parameters": 287392,
+    "prediction_type": "labels",
+    "epoch_size": 40,
+    "best_step": 2040,
+    "metrics": {
+        "train": {
+            "rmse": 0.8232218059944577,
+            "mae": 0.6069431304931641,
+            "r2": 0.21722566070497384,
+            "score": -0.8232218059944577
+        },
+        "val": {
+            "rmse": 0.8489115337429968,
+            "mae": 0.624875545501709,
+            "r2": 0.14534547212972015,
+            "score": -0.8489115337429968
+        },
+        "test": {
+            "rmse": 0.8670738420665092,
+            "mae": 0.6342113018035889,
+            "r2": 0.13839374999365295,
+            "score": -0.8670738420665092
+        }
+    },
+    "time": "0:01:17.062610",
+    "chunk_size": null,
+    "eval_batch_size": 32768
+}
