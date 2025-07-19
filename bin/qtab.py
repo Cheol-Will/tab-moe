@@ -1,5 +1,4 @@
 import math
-import shutil
 import statistics
 from pathlib import Path
 from typing import Any, Literal, Optional, Union, Type
@@ -64,12 +63,11 @@ class Model(nn.Module):
         bins: None | list[Tensor],
         #
         num_embeddings: None | dict = None,
-        label_bins: None | list[Tensor] = None,
         momentum: float, # momentum
         d_main: int,
         d_multiplier: float,
         encoder_n_blocks: int,
-        predictor_n_blocks: int,
+        # predictor_n_blocks: int,
         mixer_normalization: Union[bool, Literal['dropout0']],
         dropout0: float,
         dropout1: Union[bool, Literal['dropout0']],
@@ -77,13 +75,7 @@ class Model(nn.Module):
         activation: str,
         queue_size: int, 
         is_classification: bool,
-        num_heads: int = 1,
-        predictor_type: str = 'mha',
-        context_size: int = 96, # Need to check
-        use_aux_loss: bool = False,
-        multi_output_head: bool = False,
-        use_adapter: bool = False,
-        k: int = None,
+        temperature: float = 0.2,
         candidate_encoding_batch_size: None | int = None,
     ):
         if mixer_normalization == 'auto':
@@ -136,60 +128,23 @@ class Model(nn.Module):
         self.register_buffer("queue", torch.randn(queue_size, d_main))
         self.register_buffer("queue_label", torch.zeros(queue_size, dtype=torch.long if is_classification else torch.float))
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
-        self.queue = F.normalize(self.queue, dim=-1)
+        # self.queue = F.normalize(self.queue, dim=-1)
 
-        # >>> Retreival
-        if n_classes is None:
-            if label_bins is not None:
-                # using label_bins, apply piecewise linear embedding
-                self.label_encoder = nn.Linear(1, d_main)
-                pass
-            else:
-                self.label_encoder = nn.Linear(1, d_main)
-        else:
-            self.label_encoder = nn.Sequential(
-                nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) # (B, 1, d_main) -> (B, d_main)
-            )
 
         d_out = 1 if n_classes is None else n_classes
 
-        if use_adapter:
-            self.adapter = lib.reformer.Adapter(
-                k, d_main
-            )
-        else:
-            self.adapter = None
-
-        self.blocks1 = nn.ModuleList(
-            [lib.reformer.Transformer(dim=d_main, num_heads=num_heads, attention_type=predictor_type) for _ in range(predictor_n_blocks)]
-        )
-        if multi_output_head: 
-            self.head = nn.ModuleList([
-                nn.Linear(d_main, d_out) for _ in range(predictor_n_blocks + 1)
-            ]) 
-        else:
-            self.head = nn.Linear(d_main, d_out)
-
+        self.d_out = d_out
         self.n_classes = n_classes
-        self.predictor_n_blocks = predictor_n_blocks
+        self.scale = d_main ** -0.5
         self.momentum = momentum
         self.queue_size = queue_size
-        self.context_size = context_size
         self.search_index = None
         self.candidate_encoding_batch_size = candidate_encoding_batch_size
-        self.multi_output_head = multi_output_head
-        self.use_aux_loss = use_aux_loss
+        self.temperature = temperature
         self.reset_parameters()
 
     def reset_parameters(self):
-        if isinstance(self.label_encoder, nn.Linear):
-            bound = 1 / math.sqrt(2.0)
-            nn.init.uniform_(self.label_encoder.weight, -bound, bound)  # type: ignore[code]  # noqa: E501
-            nn.init.uniform_(self.label_encoder.bias, -bound, bound)  # type: ignore[code]  # noqa: E501
-        else:
-            assert isinstance(self.label_encoder[0], nn.Embedding)
-            nn.init.uniform_(self.label_encoder[0].weight, -1.0, 1.0)  # type: ignore[code]  # noqa: E501
-    
+        pass
     def _encode(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None
     ) -> Tensor:
@@ -240,100 +195,17 @@ class Model(nn.Module):
         self.queue_ptr[0] = ptr
 
     @torch.no_grad()
-    def retrieve_queue(
-        self, 
-        query: Tensor,
-        key: Tensor,
-        y: Tensor,
-    ):
-        """
-        Retrieve from the memory queue.
-        """        
-        batch_size, d_main = query.shape
-        device = query.device
-        queue = self.queue.to(torch.float32)
-        if self.search_index is None:
-            self.search_index = (
-                faiss.GpuIndexFlatIP(faiss.StandardGpuResources(), d_main)
-                if device.type == 'cuda'
-                else faiss.IndexFlatIP(d_main)
-            )
-        self.search_index.reset()
-        self.search_index.add(queue)
-        distances: Tensor
-        context_idx: Tensor
-        distances, context_idx = self.search_index.search(
-            query, self.context_size  
-        ) 
-        context_k = queue[context_idx] # (B, K, D)
-        context_y = self.queue_label[context_idx] # (B, K)
-
-        self._dequeue_and_enqueue(key, y) # enqueue current batch
-
-        return context_k, context_y
-
-    @torch.no_grad()
-    def retrieve(
-        self,
-        query: Tensor,
-        key: Tensor,
-        y: Tensor,
-        idx: Tensor, 
-        is_train: bool,
-        candidate_k: None | Tensor = None,
-        candidate_y: None | Tensor = None,
-        candidate_idx: None | Tensor = None,
-    ):
-        """
-        k, y, and idx are used when evaluating on trainset.
-        Current batch is excluded in candidates, append it.         
-        """
-        # preproc: include target object in candidate.
-        if is_train:
-            assert key is not None
-            candidate_k = torch.cat([key, candidate_k])
-            candidate_y = torch.cat([y, candidate_y])
-            candidate_idx = torch.cat([idx, candidate_idx])
-
-        batch_size, d_main = query.shape
-        device = query.device
-        candidate_k = candidate_k.to(torch.float32)
-        query = query.to(torch.float32)
- 
-        if self.search_index is None:
-            self.search_index = (
-                faiss.GpuIndexFlatIP(faiss.StandardGpuResources(), d_main)
-                if device.type == 'cuda'
-                else faiss.IndexFlatIP(d_main)
-            )
-        self.search_index.reset()
-        self.search_index.add(candidate_k)
-        distances: Tensor
-        context_idx: Tensor
-        distances, context_idx = self.search_index.search(
-            query, self.context_size + (1 if is_train else 0) 
-        ) # During training, search one more index and exclude itself.
-
-        # postproc: mask target object and exclude.
-        if is_train:
-            distances[
-                context_idx == torch.arange(batch_size, device=device)[:, None]
-            ] = torch.inf
-            context_idx = context_idx.gather(-1, distances.argsort()[:, :-1]) # discard inf-index           
-        context_k = candidate_k[context_idx] # (B, K, D)
-        context_y = candidate_y[context_idx] # (B, K)
-
-        return context_k, context_y
-
-    @torch.no_grad()
     def calculate_key(
         self, 
         x_num: None | Tensor = None, 
         x_cat: None | Tensor = None, 
     ):
+        """
+        Before evaluation, calculate keys for whole train dataset.
+        """
         x = self._encode(x_num, x_cat)
         x = self.encoder_key(x)
-        x = F.normalize(x, dim=-1)
+        # x = F.normalize(x, dim=-1)
         return x
 
     def forward(
@@ -342,76 +214,70 @@ class Model(nn.Module):
         x_num: None | Tensor = None, 
         x_cat: None | Tensor = None,
         y: None | Tensor = None, 
-        idx: None | Tensor = None,
         candidate_k: Tensor,
         candidate_y: Tensor,
-        candidate_idx: Tensor,
         is_train: bool,
     ) -> Tensor:
         """
-        During training, candidate_* are not given since queue is used.
-        During inference, candidate_* must be given. 
+
+        candidate_k: pre-computed keys for evalaution.
+        candidate_y: y label of trainset for evalaution.
         """
 
         x = self._encode(x_num, x_cat) # preprocessing
         query = self.encoder_query(x)
-        query = F.normalize(query, dim=1) # queries: BxD
+        # query = F.normalize(query, dim=-1) # queries: BxD
         
         if is_train:
             with torch.no_grad():
                 key_x = self.encoder_key(x)
-                key_x = F.normalize(key_x, dim=-1)
+                # key_x = F.normalize(key_x, dim=-1)
         else:
             key_x = None
 
         if self.training:
-            # During trainig, retrieve from memory queue.
-            context_k, context_y = self.retrieve_queue(query=query, key=key_x, y=y)
+            # During trainig, use memory queue.
+            assert candidate_k is None
+            assert candidate_y is None
+            candidate_k = self.queue
+            candidate_y = self.queue_label
         else:
-            # During evaluation, retrieve from pre-computed candidates set.
-            context_k, context_y = self.retrieve(
-                query,
-                key_x,
-                y,
-                idx,
-                is_train,
-                candidate_k,
-                candidate_y,
-                candidate_idx
-            )
+            # During evaluation, use pre-computed candidates set.
+            if is_train:
+                # During eval on train set, add itself and remove later. 
+                assert y is not None
+                candidate_k = torch.cat([key_x, candidate_k])
+                candidate_y = torch.cat([y, candidate_y])
 
-        if self.predictor_n_blocks == 0:
-            # Without predictor blocks, just take average.
-            weight = torch.einsum('bd,bmd->bm', query, context_k) 
-            weight = F.softmax(weight, dim=-1)
+        # attention style wiht temperature T
+        similarities = torch.mm(query, candidate_k.T) * self.scale  # (B, N)
+        distances = -similarities / self.temperature # 
 
-            if self.n_classes is None:
-                # reg
-                pred =torch.sum(weight * context_y, dim=1) # (B,) 
-            else:
-                # clf
-                context_y_one_hot = F.one_hot(context_y, self.n_classes).float()
-                pred = torch.einsum('bm,bmc->bc', weight, context_y_one_hot)
-            return pred
+        if is_train and not self.training:
+            # During eval on train set, remove the label of training index. 
+            distances = distances.fill_diagonal_(torch.inf)  
+        weights = F.softmax(-distances, dim=-1) # (B, N)        
+        if self.n_classes is not None:
+            candidate_y = F.one_hot(candidate_y, self.n_classes).to(x.dtype)
+        elif len(candidate_y.shape) == 1:
+            candidate_y=candidate_y.unsqueeze(-1)
 
-        context_y = self.label_encoder(context_y.unsqueeze(-1)) # (B, M, D)
-        
-        if self.use_aux_loss:
-            out = self.head(query) if not self.multi_output_head else self.head[0](query)
-            outs = [out[:, None]]
+        logits = torch.mm(weights, candidate_y) # (B, N) x (N, D_out) -> (B, D_out)
+        eps = 1e-7
 
-        if self.adapter is not None:
-            query = self.adapter(query) # (B, K, D)
+        if self.n_classes is not None:
+            # if task type is classification, since the logit is already normalized, we calculate the log of the logit 
+            # and use nll_loss to calculate the loss            
+            logits = torch.log(logits+eps)
 
-        for idx, block in enumerate(self.blocks1):
-            query = block(query, context_k, context_y) # update query
-            if self.use_aux_loss:
-                out = self.head(query) if not self.multi_output_head else self.head[idx+1](query)
-                outs.append(out)
-        if self.use_aux_loss:
-            return torch.cat(outs, dim=1)
-        else:
-            return self.head(query)
+        if self.training:
+            self._dequeue_and_enqueue(key_x, y) # enqueue current batch
+            
+        if logits.ndim == 2:
+            logits = logits.unsqueeze(1)
+        # print(logits)    
+        return logits
+  
 
 class Config(TypedDict):
     seed: int
@@ -523,20 +389,14 @@ def main(
         "n_classes": dataset.task.try_compute_n_classes(),
         "bins": bin_edges,
     }
-    # below k is not used. 
-    # if adapter is used, then need to specify k correctly. 
-
 
     model_args = config['model'].copy()
-    model_args.pop('arch_type', None)
     model_args.pop('share_training_batches', None)
-
     queue_ratio = model_args.pop('queue_ratio', None)
     queue_size_ = min(dataset.size('train'), queue_ratio * batch_size)
     queue_size = (queue_size_ // batch_size) * batch_size
     model_args['queue_size'] = queue_size
-    print(f"Init with {model_args}" )
-
+    print(f"Init QTab with {model_args}" )
     model = Model(
         **meta_data,
         **model_args,
@@ -570,7 +430,8 @@ def main(
     _loss_fn = (
         nn.functional.mse_loss
         if dataset.task.is_regression
-        else nn.functional.cross_entropy
+        # else nn.functional.cross_entropy
+        else nn.functional.nll_loss
     )
 
     # Keep the train_indices for Retrieval-based Model
@@ -667,18 +528,24 @@ def main(
         x_num, x_cat, y = get_Xy(part, idx)
         is_train = part == 'train'
 
-        candidate_idx = train_indices
-        if is_train and not training:
-            candidate_idx = train_indices[~torch.isin(train_indices, idx)]
+        if training:
+            # During training, use queue.
+            cand_k = None
+            cand_y = None
+        else:
+            candidate_idx = train_indices
+            if is_train:
+                # eval on train
+                candidate_idx = train_indices[~torch.isin(train_indices, idx)]
+            cand_k = candidate_k[candidate_idx]
+            cand_y = candidate_y[candidate_idx]
 
         pred = model(
             x_num=x_num,
             x_cat=x_cat,
             y=y if is_train else None,
-            idx=idx,
-            candidate_k=candidate_k,
-            candidate_y=candidate_y,
-            candidate_idx=candidate_idx,
+            candidate_k=cand_k,
+            candidate_y=cand_y,
             is_train=is_train,
         )
         return pred.squeeze(-1).float()

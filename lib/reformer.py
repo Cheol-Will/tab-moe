@@ -279,12 +279,13 @@ class BaseEncoder(nn.Module):
 
         def make_block():
             return nn.Sequential(*[
+                nn.BatchNorm1d(d_main),
                 nn.Linear(d_main, d_hidden),
                 nn.ReLU(),
                 nn.Dropout(dropout_prob),
                 nn.Linear(d_hidden, d_main),
-                nn.ReLU(),
-                nn.Dropout(dropout_prob)
+                # nn.ReLU(),
+                # nn.Dropout(dropout_prob)
             ])
         self.blocks = nn.ModuleList(
             [make_block() for _ in range(n_blocks)]
