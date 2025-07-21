@@ -1,0 +1,163 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.qtabformer.main",
+        "n_trials": 25,
+        "space": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/sberbank-housing",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "distance_metric": "cossim",
+                "encoder_n_blocks": 1,
+                "temperature": 0.02,
+                "momentum": 0.999,
+                "queue_ratio": 64,
+                "d_main": [
+                    "_tune_",
+                    "int-power-of-two",
+                    7,
+                    10
+                ],
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        16,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        16,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.qtabformer.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/sberbank-housing",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 3.0136424962851303e-05,
+                "weight_decay": 2.2662827975474763e-06
+            },
+            "model": {
+                "distance_metric": "cossim",
+                "encoder_n_blocks": 1,
+                "temperature": 0.02,
+                "momentum": 0.999,
+                "queue_ratio": 64,
+                "d_main": 256,
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": 0.5196462853842752,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 54,
+                    "frequency_init_scale": 0.48964405169011843,
+                    "d_embedding": 20,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 2270339,
+        "prediction_type": "labels",
+        "epoch_size": 74,
+        "best_step": 1998,
+        "metrics": {
+            "train": {
+                "rmse": 0.23267073091129992,
+                "mae": 0.12166254222393036,
+                "r2": 0.6541423897377517,
+                "score": -0.23267073091129992
+            },
+            "val": {
+                "rmse": 0.24346391352149988,
+                "mae": 0.1338890790939331,
+                "r2": 0.6040681361168756,
+                "score": -0.24346391352149988
+            },
+            "test": {
+                "rmse": 0.2781710977606138,
+                "mae": 0.20661325752735138,
+                "r2": 0.47123389607398447,
+                "score": -0.2781710977606138
+            }
+        },
+        "time": "0:00:45.571594",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 20,
+        "tuning_time": "0:11:04.533153"
+    },
+    "time": "0:13:57.669796",
+    "n_completed_trials": 25
+}

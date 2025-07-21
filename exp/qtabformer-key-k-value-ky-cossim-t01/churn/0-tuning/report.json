@@ -1,0 +1,242 @@
+{
+    "function": "bin.tune.main",
+    "gpus": [
+        "NVIDIA GeForce RTX 4090"
+    ],
+    "config": {
+        "seed": 0,
+        "function": "bin.qtabformerv3.main",
+        "n_trials": 100,
+        "sampler": {
+            "n_startup_trials": 20
+        },
+        "space": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/churn",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": [
+                    "_tune_",
+                    "loguniform",
+                    3e-05,
+                    0.001
+                ],
+                "weight_decay": [
+                    "_tune_",
+                    "?loguniform",
+                    0.0,
+                    1e-06,
+                    0.0001
+                ]
+            },
+            "model": {
+                "use_mlp_head": false,
+                "use_key_as_value": true,
+                "encoder_n_blocks": 1,
+                "distance_metric": "cossim",
+                "temperature": 0.1,
+                "momentum": 0.999,
+                "queue_ratio": 64,
+                "d_main": [
+                    "_tune_",
+                    "int-power-of-two",
+                    6,
+                    9
+                ],
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": [
+                        "_tune_",
+                        "int",
+                        16,
+                        96
+                    ],
+                    "frequency_init_scale": [
+                        "_tune_",
+                        "loguniform",
+                        0.01,
+                        100.0
+                    ],
+                    "d_embedding": [
+                        "_tune_",
+                        "int",
+                        16,
+                        64
+                    ],
+                    "lite": true
+                }
+            }
+        }
+    },
+    "best": {
+        "function": "bin.qtabformerv3.main",
+        "gpus": [
+            "NVIDIA GeForce RTX 4090"
+        ],
+        "config": {
+            "seed": 0,
+            "batch_size": 256,
+            "patience": 16,
+            "n_epochs": -1,
+            "amp": true,
+            "data": {
+                "cache": true,
+                "path": "data/churn",
+                "num_policy": "noisy-quantile",
+                "cat_policy": "ordinal"
+            },
+            "optimizer": {
+                "type": "AdamW",
+                "lr": 0.0004031688289956232,
+                "weight_decay": 0.0
+            },
+            "model": {
+                "use_mlp_head": false,
+                "use_key_as_value": true,
+                "encoder_n_blocks": 1,
+                "distance_metric": "cossim",
+                "temperature": 0.1,
+                "momentum": 0.999,
+                "queue_ratio": 64,
+                "d_main": 64,
+                "d_multiplier": 2.0,
+                "mixer_normalization": "auto",
+                "dropout0": 0.17138910456762999,
+                "dropout1": 0.0,
+                "normalization": "LayerNorm",
+                "activation": "ReLU",
+                "num_embeddings": {
+                    "type": "PeriodicEmbeddings",
+                    "n_frequencies": 46,
+                    "frequency_init_scale": 0.10323464646465264,
+                    "d_embedding": 44,
+                    "lite": true
+                }
+            }
+        },
+        "n_parameters": 50048,
+        "prediction_type": "probs",
+        "epoch_size": 25,
+        "best_step": 775,
+        "metrics": {
+            "train": {
+                "0": {
+                    "precision": 0.8919112383679313,
+                    "recall": 0.978021978021978,
+                    "f1-score": 0.9329839011606141,
+                    "support": 5096.0
+                },
+                "1": {
+                    "precision": 0.8620689655172413,
+                    "recall": 0.5368098159509203,
+                    "f1-score": 0.6616257088846881,
+                    "support": 1304.0
+                },
+                "accuracy": 0.888125,
+                "macro avg": {
+                    "precision": 0.8769901019425863,
+                    "recall": 0.7574158969864491,
+                    "f1-score": 0.7973048050226511,
+                    "support": 6400.0
+                },
+                "weighted avg": {
+                    "precision": 0.8858308752746032,
+                    "recall": 0.888125,
+                    "f1-score": 0.8776946694843941,
+                    "support": 6400.0
+                },
+                "cross-entropy": 0.27358714231758985,
+                "roc-auc": 0.9190452062726931,
+                "score": 0.888125
+            },
+            "val": {
+                "0": {
+                    "precision": 0.8770203794799719,
+                    "recall": 0.9795918367346939,
+                    "f1-score": 0.9254727474972191,
+                    "support": 1274.0
+                },
+                "1": {
+                    "precision": 0.8531073446327684,
+                    "recall": 0.46319018404907975,
+                    "f1-score": 0.6003976143141153,
+                    "support": 326.0
+                },
+                "accuracy": 0.874375,
+                "macro avg": {
+                    "precision": 0.8650638620563702,
+                    "recall": 0.7213910103918868,
+                    "f1-score": 0.7629351809056673,
+                    "support": 1600.0
+                },
+                "weighted avg": {
+                    "precision": 0.8721480986298542,
+                    "recall": 0.874375,
+                    "f1-score": 0.8592386891111616,
+                    "support": 1600.0
+                },
+                "cross-entropy": 0.34271091600024617,
+                "roc-auc": 0.8552503587560555,
+                "score": 0.874375
+            },
+            "test": {
+                "0": {
+                    "precision": 0.8698591549295774,
+                    "recall": 0.9692404268675455,
+                    "f1-score": 0.9168646080760094,
+                    "support": 1593.0
+                },
+                "1": {
+                    "precision": 0.7822222222222223,
+                    "recall": 0.43243243243243246,
+                    "f1-score": 0.5569620253164557,
+                    "support": 407.0
+                },
+                "accuracy": 0.86,
+                "macro avg": {
+                    "precision": 0.8260406885758999,
+                    "recall": 0.7008364296499889,
+                    "f1-score": 0.7369133166962325,
+                    "support": 2000.0
+                },
+                "weighted avg": {
+                    "precision": 0.8520250391236307,
+                    "recall": 0.86,
+                    "f1-score": 0.8436244324844402,
+                    "support": 2000.0
+                },
+                "cross-entropy": 0.3585685507944923,
+                "roc-auc": 0.8425050628440459,
+                "score": 0.86
+            }
+        },
+        "time": "0:00:17.759635",
+        "chunk_size": null,
+        "eval_batch_size": 32768,
+        "trial_id": 82,
+        "tuning_time": "0:17:20.624584"
+    },
+    "time": "0:21:10.664738",
+    "n_completed_trials": 100
+}
