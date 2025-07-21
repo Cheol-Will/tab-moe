@@ -33,6 +33,14 @@ def _suggest(trial: optuna.trial.Trial, distribution: str, label: str, *args):
         # for moe_ratio
         low, high, step = args
         return trial.suggest_float(label, low, high, step=step)
+    
+    elif distribution == "categorical":
+        if len(args) == 1 and isinstance(args[0], (list, tuple)):
+            choices = args[0]
+        else:
+            choices = list(args)
+        return trial.suggest_categorical(label, choices)
+
     else:
         return getattr(trial, f'suggest_{distribution}')(label, *args)
 

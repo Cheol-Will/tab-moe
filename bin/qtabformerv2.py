@@ -77,9 +77,6 @@ class L2Distance(nn.Module):
         # L2 distance (Euclidean distance)
         # distances = torch.cdist(query, candidate_k, p=2)  # (B, N)
         # inplace operation -> grad error
-        query = query.to(torch.float32)
-        key = key.to(torch.float32)
-
         query_squared = torch.sum(query**2, dim=-1, keepdim=True)
         key_squared = torch.sum(key**2, dim=-1, keepdim=True)
         cross_term = torch.mm(query, key.T)
@@ -101,7 +98,8 @@ class CosineSimilarity(nn.Module):
         self.temperature = temperature
 
     def forward(self, query, key):
-        # Note that query, key are already normalized.
+        query = F.normalize(query, dim=-1)
+        key = F.normalize(key, dim=-1)
         similarities = torch.mm(query, key.T) # (B, N)
         distances = -similarities  
         distances = distances / self.temperature  
@@ -156,6 +154,7 @@ class Model(nn.Module):
         activation: str,
         queue_size: int, 
         is_classification: bool,
+        use_mlp_head: bool = False,
         distance_metric: str = 'sdp',
         temperature: float = 0.2,
         candidate_encoding_batch_size: None | int = None,
@@ -208,14 +207,31 @@ class Model(nn.Module):
             param_k.requires_grad = False  # not update by gradient
 
         self.register_buffer("queue", torch.randn(queue_size, d_main))
-        self.register_buffer("queue_label", torch.zeros(queue_size, dtype=torch.long if is_classification else torch.float))
-        self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))
-        if distance_metric == 'cossim':
-            self.queue = F.normalize(self.queue, dim=-1)
+        self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))    
 
         self.distance = DistanceMetric(d_main ** -0.5, temperature, distance_metric)
 
         d_out = 1 if n_classes is None else n_classes
+        self.transformation = nn.Linear(d_main, d_main) # key transformation
+        if n_classes is None:
+            # Naive linear embeddign for regression
+            self.label_encoder = nn.Linear(1, d_main) 
+        else:
+            # Embedding lookup table for classification
+            self.label_encoder = nn.Sequential(
+                nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) # (B, 1, d_main) -> (B, d_main)
+            )
+
+        if use_mlp_head:
+            self.head = nn.Sequential(*[
+                nn.Linear(d_main, d_main),
+                nn.ReLU(),
+                nn.Dropout(),
+                nn.Linear(d_main, d_out),
+            ])
+        else:
+            self.head = nn.Linear(d_main, d_out)
+
         self.d_out = d_out
         self.n_classes = n_classes
         self.scale = d_main ** -0.5
@@ -258,7 +274,7 @@ class Model(nn.Module):
             param_k.data = param_k.data * self.momentum + param_q.data * (1.0 - self.momentum)
 
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys, labels) -> None:
+    def _dequeue_and_enqueue(self, keys) -> None:
         batch_size = keys.shape[0]
         ptr = int(self.queue_ptr)
 
@@ -269,11 +285,8 @@ class Model(nn.Module):
             overflow = (ptr + batch_size) - self.queue_size
             self.queue[ptr:self.queue_size, :]  = keys[:self.queue_size - ptr, :]
             self.queue[0:overflow, :] = keys[self.queue_size - ptr:, :]
-            self.queue_label[ptr:self.queue_size]  = labels[:self.queue_size - ptr]
-            self.queue_label[0:overflow] = labels[self.queue_size - ptr:]
         else:
             self.queue[ptr:ptr + batch_size, :] = keys
-            self.queue_label[ptr:ptr + batch_size] = labels
             
         ptr = (ptr + batch_size) % self.queue_size # adjust pointer
         self.queue_ptr[0] = ptr
@@ -283,14 +296,15 @@ class Model(nn.Module):
         self, 
         x_num: None | Tensor = None, 
         x_cat: None | Tensor = None, 
+        y: None | Tensor = None,
     ):
         """
         Before evaluation, calculate keys for whole train dataset.
         """
         x = self._encode(x_num, x_cat)
         x = self.encoder_key(x)
-        if self.distance_metric == 'cossim':
-            x = F.normalize(x, dim=-1)
+        x = x + self.label_encoder(y.unsqueeze(-1))
+       
         return x
 
     def forward(
@@ -304,21 +318,17 @@ class Model(nn.Module):
         is_train: bool,
     ) -> Tensor:
         """
-
         candidate_k: pre-computed keys for evalaution.
         candidate_y: y label of trainset for evalaution.
         """
-
         x = self._encode(x_num, x_cat) # preprocessing
         query = self.encoder_query(x)
-        if self.distance_metric == 'cossim':
-            query = F.normalize(query, dim=-1)
-        
+       
         if is_train:
             with torch.no_grad():
                 key_x = self.encoder_key(x)
-                if self.distance_metric == 'cossim':
-                    key_x = F.normalize(key_x, dim=-1)
+                context_y = self.label_encoder(y.unsqueeze(-1))
+                key_x = key_x + context_y
         else:
             key_x = None
 
@@ -327,41 +337,31 @@ class Model(nn.Module):
             assert candidate_k is None
             assert candidate_y is None
             candidate_k = self.queue
-            candidate_y = self.queue_label
         else:
             # During evaluation, use pre-computed candidates set.
             if is_train:
                 # During eval on train set, add itself and remove later. 
                 assert y is not None
                 candidate_k = torch.cat([key_x, candidate_k])
-                candidate_y = torch.cat([y, candidate_y])
         distances = self.distance(query, candidate_k) # scaled dot product or L2 distance
-        distances = distances.to(torch.float32)
         if is_train and not self.training:
             # During eval on train set, remove the label of training index. 
             distances = distances.fill_diagonal_(torch.inf)  
         
         weights = F.softmax(-distances, dim=-1) # (B, N)        
-        if self.n_classes is not None:
-            candidate_y = F.one_hot(candidate_y, self.n_classes).to(x.dtype)
-        elif len(candidate_y.shape) == 1:
-            candidate_y=candidate_y.unsqueeze(-1)
-        
-        # Take weighted sum for prediction.
-        logits = torch.mm(weights, candidate_y) # (B, N) x (N, D_out) -> (B, D_out)
-        eps = 1e-7
 
-        if self.n_classes is not None:
-            # if task type is classification, since the logit is already normalized, we calculate the log of the logit 
-            # and use nll_loss to calculate the loss
-            logits = torch.log(logits+eps)
+        # Add context information to query.
+        context = self.transformation(candidate_k)
+        context = torch.mm(weights, context)
+        query = query + context
+        query = self.head(query) 
 
         if self.training:
-            self._dequeue_and_enqueue(key_x, y) # enqueue current batch
+            self._dequeue_and_enqueue(key_x) # enqueue current batch
             
-        if logits.ndim == 2:
-            logits = logits.unsqueeze(1)
-        return logits
+        if query.ndim == 2:
+            query = query.unsqueeze(1) # 
+        return query
   
 
 class Config(TypedDict):
@@ -481,7 +481,7 @@ def main(
     queue_size_ = min(dataset.size('train'), queue_ratio * batch_size)
     queue_size = (queue_size_ // batch_size) * batch_size
     model_args['queue_size'] = queue_size
-    print(f"Init QTab with {model_args}" )
+    print(f"Init qtabformerv2 with {model_args}" )
     model = Model(
         **meta_data,
         **model_args,
@@ -515,8 +515,8 @@ def main(
     _loss_fn = (
         nn.functional.mse_loss
         if dataset.task.is_regression
-        # else nn.functional.cross_entropy
-        else nn.functional.nll_loss
+        else nn.functional.cross_entropy
+        # else nn.functional.nll_loss
     )
 
     # Keep the train_indices for Retrieval-based Model
@@ -585,7 +585,7 @@ def main(
         candidate_y = []
         for idx in torch.arange(dataset.size("train"), device=device).split(batch_size):
             x_num, x_cat, y = get_Xy('train', idx)
-            key = model.calculate_key(x_num, x_cat)
+            key = model.calculate_key(x_num, x_cat, y)
             # print(key.shape)
             candidate_k.append(key)
             candidate_y.append(y)

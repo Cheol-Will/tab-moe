@@ -380,19 +380,19 @@ class Model(nn.Module):
                 candidate_idx
             )
 
-        if self.predictor_n_blocks == 0:
-            # Without predictor blocks, just take average.
-            weight = torch.einsum('bd,bmd->bm', query, context_k) 
-            weight = F.softmax(weight, dim=-1)
+        # if self.predictor_n_blocks == 0:
+        #     # Without predictor blocks, just take average.
+        #     weight = torch.einsum('bd,bmd->bm', query, context_k) 
+        #     weight = F.softmax(weight, dim=-1)
 
-            if self.n_classes is None:
-                # reg
-                pred =torch.sum(weight * context_y, dim=1) # (B,) 
-            else:
-                # clf
-                context_y_one_hot = F.one_hot(context_y, self.n_classes).float()
-                pred = torch.einsum('bm,bmc->bc', weight, context_y_one_hot)
-            return pred
+        #     if self.n_classes is None:
+        #         # reg
+        #         pred =torch.sum(weight * context_y, dim=1) # (B,) 
+        #     else:
+        #         # clf
+        #         context_y_one_hot = F.one_hot(context_y, self.n_classes).float()
+        #         pred = torch.einsum('bm,bmc->bc', weight, context_y_one_hot)
+        #     return pred
 
         context_y = self.label_encoder(context_y.unsqueeze(-1)) # (B, M, D)
         
