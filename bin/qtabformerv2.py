@@ -325,9 +325,9 @@ class Model(nn.Module):
         query = self.encoder_query(x)
        
         if is_train:
+            context_y = self.label_encoder(y.unsqueeze(-1))
             with torch.no_grad():
                 key_x = self.encoder_key(x)
-                context_y = self.label_encoder(y.unsqueeze(-1))
                 key_x = key_x + context_y
         else:
             key_x = None

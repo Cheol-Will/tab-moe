@@ -25,6 +25,7 @@ import lib
 import lib.data
 import lib.deep
 import lib.reformer
+import lib.qtabformer
 import lib.env
 from lib import KWArgs, PartKey
 
@@ -53,85 +54,6 @@ def compute_label_bins(y: Tensor, n_bins: int):
     return bins
 
 
-
-class ScaledDotProductDistance(nn.Module):
-    def __init__(self, scale: float, temperature: float):
-        super(ScaledDotProductDistance, self).__init__()
-        self.scale = scale
-        self.temperature = temperature
-
-    def forward(self, query, key):
-        # Scaled dot product
-        similarities = torch.mm(query, key.T) * self.scale  # (B, N)
-        distances = -similarities  
-        distances = distances / self.temperature  
-        return distances
-
-
-class L2Distance(nn.Module):
-    def __init__(self, temperature: float):
-        super(L2Distance, self).__init__()
-        self.temperature = temperature
-
-    def forward(self, query, key):
-        # L2 distance (Euclidean distance)
-        # distances = torch.cdist(query, candidate_k, p=2)  # (B, N)
-        # inplace operation -> grad error
-        query_squared = torch.sum(query**2, dim=-1, keepdim=True)
-        key_squared = torch.sum(key**2, dim=-1, keepdim=True)
-        cross_term = torch.mm(query, key.T)
-
-        distances = query_squared + key_squared.T - 2 * cross_term
-        distances = torch.clamp(distances, min=0.0)
-        distances = torch.sqrt(distances)
-        distances = distances / self.temperature  
-
-        return distances
-
-
-class CosineSimilarity(nn.Module):
-    def __init__(
-        self, 
-        temperature: float = 1.0,
-    ):
-        super().__init__()
-        self.temperature = temperature
-
-    def forward(self, query, key):
-        query = F.normalize(query, dim=-1)
-        key = F.normalize(key, dim=-1)
-        similarities = torch.mm(query, key.T) # (B, N)
-        distances = -similarities  
-        distances = distances / self.temperature  
-        return distances        
-
-
-class DistanceMetric(nn.Module):
-    def __init__(
-        self,
-        scale: None | float = None,
-        temperature: float = 0.2,
-        distance_name: str = 'sdp',
-    ):
-        super(DistanceMetric, self).__init__()
-
-        assert distance_name in ['sdp', 'l2', 'cossim']
-
-        if distance_name == 'sdp':
-            assert scale is not None
-            print(f"Initialize ScaledDotProductDistance with scale={scale} and temperature={temperature}")
-            self.distance = ScaledDotProductDistance(scale=scale, temperature=temperature)
-        elif distance_name == 'l2':
-            print(f"Initialize L2Distance with temperature={temperature}")
-            self.distance = L2Distance(temperature=temperature)
-        elif distance_name == 'cossim':
-            print(f"Initialize CosineSimilarity with temperature={temperature}")
-            self.distance = CosineSimilarity(temperature=temperature)
-
-    def forward(self, query, key):
-        return self.distance(query, key)
-
-
 class Model(nn.Module):
     def __init__(
         self,
@@ -146,18 +68,19 @@ class Model(nn.Module):
         d_main: int,
         d_multiplier: float,
         encoder_n_blocks: int,
-        # predictor_n_blocks: int,
         mixer_normalization: Union[bool, Literal['dropout0']],
         dropout0: float,
         dropout1: Union[bool, Literal['dropout0']],
-        normalization: str, # BatchNorm or LayerNorm
-        activation: str,
         queue_size: int, 
         is_classification: bool,
+        predictor_n_blocks: int = 1,
+        num_heads: int = 4,
+        query_expansion_ratio: int = 1,
+        attention_type: str = 'mha',
         use_label_encoder: bool = False,
         use_mlp_head: bool = False,
-        distance_metric: str = 'sdp',
-        temperature: float = 0.2,
+        use_multi_output_head: bool = False,
+        use_key_as_value: bool = False,
         candidate_encoding_batch_size: None | int = None,
     ):
         if mixer_normalization == 'auto':
@@ -208,48 +131,65 @@ class Model(nn.Module):
             param_k.requires_grad = False  # not update by gradient
 
         self.register_buffer("queue", torch.randn(queue_size, d_main))
-        self.register_buffer("queue_label", torch.zeros(queue_size, dtype=torch.long if is_classification else torch.float))
+        self.register_buffer("queue_label", torch.randn(queue_size, d_main))
         self.register_buffer("queue_ptr", torch.zeros(1, dtype=torch.long))    
 
-        self.distance = DistanceMetric(d_main ** -0.5, temperature, distance_metric)
-
         d_out = 1 if n_classes is None else n_classes
-        self.transformation = nn.Linear(d_main, d_main) # key transformation
-        if use_label_encoder:
-            if n_classes is None:
-                # Naive linear embeddign for regression
-                self.label_encoder = nn.Linear(1, d_main) 
-            else:
-                # Embedding lookup table for classification
-                self.label_encoder = nn.Sequential(
-                    nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) # (B, 1, d_main) -> (B, d_main)
-                )
+        if n_classes is None:
+            self.label_encoder = nn.Linear(1, d_main) # regression 
         else:
-            self.label_encoder = None
-
+            self.label_encoder = nn.Sequential(
+                nn.Embedding(n_classes, d_main), delu.nn.Lambda(lambda x: x.squeeze(-2)) 
+            ) # (B, 1, d_main) -> (B, d_main)
+        self.blocks1 = nn.ModuleList(
+            [lib.qtabformer.Transformer(
+                dim=d_main, 
+                num_heads=num_heads, 
+                attention_type=attention_type,
+                attn_drop=dropout1,
+                proj_drop=dropout1,
+                mlp_drop=dropout1,
+                is_first_block=True if i==0 else False,
+                query_expansion_ratio=query_expansion_ratio if i==0 else 1,
+            ) for i in range(predictor_n_blocks)]
+        )
+        self.transformation = nn.Sequential(*[
+            nn.Linear(d_main, d_main),
+            nn.ReLU(),
+            nn.Dropout(dropout0),
+            nn.Linear(d_main, d_main)
+        ]) # key transformation when being used as value 
+        
         if use_mlp_head:
             self.head = nn.Sequential(*[
                 nn.Linear(d_main, d_main),
                 nn.ReLU(),
-                nn.Dropout(),
+                nn.Dropout(dropout0),
                 nn.Linear(d_main, d_out),
             ])
         else:
-            self.head = nn.Linear(d_main, d_out)
+            if use_multi_output_head:
+                self.head = lib.deep.NLinear(query_expansion_ratio, d_main, d_out)
+            else:
+                self.head = nn.Linear(d_main, d_out)
 
         self.d_out = d_out
         self.n_classes = n_classes
-        self.scale = d_main ** -0.5
         self.momentum = momentum
         self.queue_size = queue_size
-        self.search_index = None
+        self.use_key_as_value = use_key_as_value
         self.candidate_encoding_batch_size = candidate_encoding_batch_size
-        self.temperature = temperature
-        self.distance_metric = distance_metric
         self.reset_parameters()
 
     def reset_parameters(self):
-        pass
+        if isinstance(self.label_encoder, nn.Linear):
+            bound = 1 / math.sqrt(2.0)
+            nn.init.uniform_(self.label_encoder.weight, -bound, bound)  # type: ignore[code]  # noqa: E501
+            nn.init.uniform_(self.label_encoder.bias, -bound, bound)  # type: ignore[code]  # noqa: E501
+        else:
+            assert isinstance(self.label_encoder[0], nn.Embedding)
+            nn.init.uniform_(self.label_encoder[0].weight, -1.0, 1.0)  # type: ignore[code]  # noqa: E501
+
     def _encode(
         self, x_num: None | Tensor = None, x_cat: None | Tensor = None
     ) -> Tensor:
@@ -279,22 +219,20 @@ class Model(nn.Module):
             param_k.data = param_k.data * self.momentum + param_q.data * (1.0 - self.momentum)
 
     @torch.no_grad()
-    def _dequeue_and_enqueue(self, keys, labels) -> None:
+    def _dequeue_and_enqueue(self, keys, y_encoded) -> None:
         batch_size = keys.shape[0]
         ptr = int(self.queue_ptr)
 
-        # print(f"Current batch size: {batch_size}")
-        # print(f"Queue pointer: {ptr}")
-
         if ptr + batch_size > self.queue_size:
             overflow = (ptr + batch_size) - self.queue_size
-            self.queue[ptr:self.queue_size, :]  = keys[:self.queue_size - ptr, :]
+            self.queue[ptr:self.queue_size, :] = keys[:self.queue_size - ptr, :]
             self.queue[0:overflow, :] = keys[self.queue_size - ptr:, :]
-            self.queue_label[ptr:self.queue_size]  = labels[:self.queue_size - ptr]
-            self.queue_label[0:overflow] = labels[self.queue_size - ptr:]
+
+            self.queue_label[ptr:self.queue_size, :] = y_encoded[:self.queue_size - ptr, :]
+            self.queue_label[0:overflow, :] = y_encoded[self.queue_size - ptr:, :]
         else:
             self.queue[ptr:ptr + batch_size, :] = keys
-            self.queue_label[ptr:ptr + batch_size] = labels
+            self.queue_label[ptr:ptr + batch_size, :] = y_encoded
             
         ptr = (ptr + batch_size) % self.queue_size # adjust pointer
         self.queue_ptr[0] = ptr
@@ -304,15 +242,19 @@ class Model(nn.Module):
         self, 
         x_num: None | Tensor = None, 
         x_cat: None | Tensor = None, 
+        y: None | Tensor = None,
     ):
         """
         Before evaluation, calculate keys for whole train dataset.
         """
-        x = self._encode(x_num, x_cat)
-        x = self.encoder_key(x)
+        key_x = self._encode(x_num, x_cat)
+        key_x = self.encoder_key(key_x)
+        value = self.label_encoder(y.unsqueeze(-1))
+        if self.use_key_as_value:
+            value = value + self.transformation(key_x) 
        
-        return x
-
+        return key_x, value
+    
     def forward(
         self,
         *,
@@ -320,59 +262,49 @@ class Model(nn.Module):
         x_cat: None | Tensor = None,
         y: None | Tensor = None, 
         candidate_k: Tensor,
-        candidate_y: Tensor,
+        candidate_v: Tensor,
         is_train: bool,
     ) -> Tensor:
         """
         candidate_k: pre-computed keys for evalaution.
-        candidate_y: y label of trainset for evalaution.
+        candidate_v: pre-computed values (label embedding + keys) for evalaution.
         """
+        eval_on_train = is_train and not self.training
+
         x = self._encode(x_num, x_cat) # preprocessing
         query = self.encoder_query(x)
        
         if is_train:
             with torch.no_grad():
                 key_x = self.encoder_key(x)
+            value = self.label_encoder(y.unsqueeze(-1)) # use grads
+            if self.use_key_as_value:
+                value = value + self.transformation(key_x) 
         else:
             key_x = None
 
         if self.training:
             # During trainig, use memory queue.
             assert candidate_k is None
-            assert candidate_y is None
+            assert candidate_v is None
             candidate_k = self.queue
-            candidate_y = self.queue_label
-        else:
-            # During evaluation, use pre-computed candidates set.
-            if is_train:
-                # During eval on train set, add itself and remove later. 
-                assert y is not None
-                candidate_k = torch.cat([key_x, candidate_k])
-                candidate_y = torch.cat([y, candidate_y])
-        distances = self.distance(query, candidate_k) # scaled dot product or L2 distance
-        if is_train and not self.training:
-            # During eval on train set, remove the label of training index. 
-            distances = distances.fill_diagonal_(torch.inf)  
-        
-        weights = F.softmax(-distances, dim=-1) # (B, N)        
+            candidate_v = self.queue_label
 
-        # Add context information to query.
-        context_key = self.transformation(candidate_k)
-        context_key = torch.mm(weights, context_key)
-        query = query + context_key
+        if eval_on_train:
+            # During eval on train set, add itself and use mask in attention. 
+            assert y is not None
+            candidate_k = torch.cat([key_x, candidate_k])
+            candidate_v = torch.cat([value, candidate_v])
         
-        if self.label_encoder is not None:
-            context_y = self.label_encoder(candidate_y.unsqueeze(-1).clone()) # (N, D)
-            context_y = torch.mm(weights, context_y)
-            query = query + context_y        
-
+        query = query.unsqueeze(1) # (B, 1, D)
+        for block in self.blocks1:
+            query = block(query, candidate_k, candidate_v, eval_on_train)
+        
         query = self.head(query) 
-
         if self.training:
-            self._dequeue_and_enqueue(key_x, y) # enqueue current batch
-            
+            self._dequeue_and_enqueue(key_x, value) # enqueue current batch
         if query.ndim == 2:
-            query = query.unsqueeze(1) # 
+            query = query.unsqueeze(1) # May not use, but leave it here.
         return query
   
 
@@ -594,18 +526,17 @@ def main(
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
     def freeze_key():
         candidate_k = []
-        candidate_y = []
+        candidate_v = []
         for idx in torch.arange(dataset.size("train"), device=device).split(batch_size):
             x_num, x_cat, y = get_Xy('train', idx)
-            key = model.calculate_key(x_num, x_cat)
-            # print(key.shape)
+            key, value = model.calculate_key(x_num, x_cat, y)
             candidate_k.append(key)
-            candidate_y.append(y)
+            candidate_v.append(value)
 
         candidate_k = torch.cat(candidate_k)
-        candidate_y = torch.cat(candidate_y)
+        candidate_v = torch.cat(candidate_v)
         
-        return candidate_k, candidate_y
+        return candidate_k, candidate_v
 
     @torch.autocast(device.type, enabled=amp_enabled, dtype=amp_dtype)  # type: ignore[code]
     def apply_model(
@@ -613,14 +544,14 @@ def main(
         idx: Tensor, 
         training: bool, 
         candidate_k: Tensor = None,
-        candidate_y: Tensor = None,
+        candidate_v: Tensor = None,
     ) -> Tensor:
         """
         Note that candidate_k is pre-computed and passed during evaluation.
         """
         if not training:
             assert candidate_k is not None
-            assert candidate_y is not None
+            assert candidate_v is not None
 
         x_num, x_cat, y = get_Xy(part, idx)
         is_train = part == 'train'
@@ -628,21 +559,21 @@ def main(
         if training:
             # During training, use queue.
             cand_k = None
-            cand_y = None
+            cand_v = None
         else:
+            # During evaluation, pre-computed candidates are given.
             candidate_idx = train_indices
             if is_train:
                 # eval on train
                 candidate_idx = train_indices[~torch.isin(train_indices, idx)]
             cand_k = candidate_k[candidate_idx]
-            cand_y = candidate_y[candidate_idx]
-
+            cand_v = candidate_v[candidate_idx]
         pred = model(
             x_num=x_num,
             x_cat=x_cat,
             y=y if is_train else None,
             candidate_k=cand_k,
-            candidate_y=cand_y,
+            candidate_v=cand_v,
             is_train=is_train,
         )
         return pred.squeeze(-1).float()
@@ -657,7 +588,7 @@ def main(
         model.eval()
         # Before evaluation, calculate key
         # 
-        candidate_k, candidate_y = freeze_key()
+        candidate_k, candidate_v = freeze_key()
 
         head_predictions: dict[PartKey, np.ndarray] = {}
         for part in parts:
@@ -666,7 +597,7 @@ def main(
                     head_predictions[part] = (
                         torch.cat(
                             [
-                                apply_model(part, idx, False, candidate_k, candidate_y)
+                                apply_model(part, idx, False, candidate_k, candidate_v)
                                 for idx in torch.arange(
                                     dataset.size(part), device=device
                                 ).split(eval_batch_size)

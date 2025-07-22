@@ -354,9 +354,9 @@ class Model(nn.Module):
         if is_train:
             with torch.no_grad():
                 key_x = self.encoder_key(x)
-                y_encoded = self.label_encoder(y.unsqueeze(-1))
-                if self.ple_label_embedding:
-                    y_encoded = y_encoded.squeeze(1)
+            y_encoded = self.label_encoder(y.unsqueeze(-1))
+            if self.ple_label_embedding:
+                y_encoded = y_encoded.squeeze(1)
         else:
             key_x = None
 

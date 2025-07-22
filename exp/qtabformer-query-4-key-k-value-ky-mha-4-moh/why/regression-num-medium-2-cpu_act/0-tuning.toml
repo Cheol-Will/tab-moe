@@ -1,0 +1,91 @@
+seed = 0
+function = "bin.qtabformer.main"
+n_trials = 100
+
+[sampler]
+n_startup_trials = 20
+
+[space]
+seed = 0
+batch_size = 128
+patience = 16
+n_epochs = -1
+amp = true
+
+[space.data]
+cache = true
+path = "data/regression-num-medium-2-cpu_act"
+num_policy = "noisy-quantile"
+
+
+[space.optimizer]
+type = "AdamW"
+lr = [
+    "_tune_",
+    "loguniform",
+    3e-05,
+    0.001,
+]
+weight_decay = [
+    "_tune_",
+    "?loguniform",
+    0.0,
+    1e-06,
+    0.0001,
+]
+
+[space.model]
+dropout1 = [
+  "_tune_",
+  "?uniform",
+  0.0,
+ 0.0,
+  0.6,
+]
+predictor_n_blocks = 1
+encoder_n_blocks = 1
+num_heads = 4
+use_multi_output_head = true
+use_mlp_head = false
+query_expansion_ratio = 4
+attention_type = "mha"
+use_key_as_value = true
+momentum = 0.999
+queue_ratio = 64
+d_main = [
+    "_tune_",
+    "int-power-of-two",
+     4,
+     9,
+]
+d_multiplier = 2.0
+mixer_normalization = "auto"
+dropout0 = [
+    "_tune_",
+    "?uniform",
+    0.0,
+    0.0,
+    0.6,
+]
+
+[space.model.num_embeddings]
+type = "PeriodicEmbeddings"
+n_frequencies = [
+    "_tune_",
+    "int",
+    16,
+    96,
+]
+frequency_init_scale = [
+    "_tune_",
+    "loguniform",
+    0.01,
+    100.0,
+]
+d_embedding = [
+    "_tune_",
+    "int",
+    16,
+    64,
+]
+lite = true

@@ -1,69 +1,126 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Uncomment one of the DEST_ROOTs below:
-# DEST_ROOT="reformer-d3-h4-m32"
-# DEST_ROOT="reformer-d3-h4-m32-aux"
-# DEST_ROOT="reformer-d3-h4-m32-mqa"
-
-# DEST_ROOT="reformer-d3-h4-m32-mqa-adapter"
-# DEST_ROOT="reformer-d3-h4-m32-adapter"
-
-dest_type="reformer-d1-h4-m32"
-# dest_type="reformer-d3-h4-m96-mqa"
-
+dest_type="qtabformer-query-4-key-k-value-ky-mqa-d4"
 
 find "exp/${dest_type}" -type f -name "0-tuning.toml" -print0 | while IFS= read -r -d '' file; do
-  echo "Processing $file …"
+  echo "Processing $file"
 
-  # 1) Replace function entry
-  if grep -q '^function *= *"bin\.model\.main"' "$file"; then
-    sed -i 's|^function *= *"bin\.model\.main"|function = "bin.reformer.main"|' "$file"
-    echo "   Updated function to bin.reformer.main"
+  # Replace function
+  if grep -q '^function *= *"[^"]*"' "$file"; then
+    sed -i 's|^function *= *"[^"]*"|function = "bin.qtabformer.main"|' "$file"
+    echo "   Updated function to bin.qtabformer.main"
   fi
 
-  # 2) Remove old tuning entries under [space.model] (single‐line deletions only)
-  sed -i '/^\[space\.model\]/,/^\[/ {
-    /^k *=/d
-    /^context_size *=/d
-    /^context_dropout *=/d
-    /^encoder_n_blocks *=/d
-    /^predictor_n_blocks *=/d
-  }' "$file"
-  echo "   Removed old model hyperparams"
+  # # # Remove single lines under [space.model] 
+  # sed -i '/^\[space\.model\]/,/^\[/ {
+  #   /^k *=/d
+  #   /^distance_metric *=/d
+  #   /^temperature *=/d
+  #   /^context_size *=/d
+  #   /^context_dropout *=/d
+  #   /^encoder_n_blocks *=/d
+  #   /^use_aux_loss *=/d
+  #   /^use_adapter *=/d
+  #   /^num_heads *=/d
+  #   /^predictor_n_blocks *=/d
+  #   /^predictor_type *=/d
+  #   /^k *=/d
+  #   /^multi_output_head *=/d
+  #   /^arch_type *=/d
+  #   /^activation *=/d
+  #   /^normalization *=/d
+  # }' "$file"
+  # echo "   Removed old model hyperparams"
 
-  # 3) Ensure or insert new parameters under [space.model]
+  # # 3) Ensure or insert new parameters under [space.model]
   declare -A params=(
-    [momentum]=0.999
-    [queue_ratio]=64
-    [context_size]=32
-    [use_aux_loss]=false
-    [use_adapter]=false
-    [multi_output_head]=false
-    [encoder_n_blocks]=1
-    [predictor_n_blocks]=1
-    [num_heads]=4
-    [predictor_type]="\"mqa\""
-    [k]=1
+    # [momentum]=0.999
+    # [queue_ratio]=64
+    # [multi_output_head]=false
+    # [encoder_n_blocks]=1
+    # [predictor_n_blocks]=1
+    # [num_heads]=4
+    # [query_expansion_ratio]=4
+    # [attention_type]="\"mqa\""
+    # [use_key_as_value]=true
+    [use_multi_output_head]=false
+    # [use_mlp_head]=false
+    # [distance_metric]="\"cossim\""
+    # [use_label_encoder]=true
+    # [k]=1
+    # [temperature]=0.1
+
   )
   for name in "${!params[@]}"; do
     value=${params[$name]}
     if grep -q "^[[:space:]]*${name}[[:space:]]*=" "$file"; then
       sed -i "s|^[[:space:]]*${name}[[:space:]]*=.*|${name} = ${value}|" "$file"
-      echo "   Replaced $name = $value"
+      echo "   Replac $name = $value"
     else
       sed -i "/^\[space\.model\]/a ${name} = ${value}" "$file"
-      echo "   Inserted $name = ${value}"
+      echo "   Insert $name = ${value}"
     fi
   done
 
-  # 4) Hard‑code d_main mapping via sed – in‐block substitutions
-  sed -E -i "/^[[:space:]]*d_main *= *\\[/,/^[[:space:]]*\\]/ {
-    s/\"int\"/\"int-power-of-two\"/;
-    s/^([[:space:]]*)16,/\1 4,/;
-    s/^([[:space:]]*)96,/\1 6,/;
-    s/^([[:space:]]*)384,/\1 9,/;
-  }" "$file"
-  echo "   Updated d_main mapping"
+  # # delete predictor_n_blocks
+  
+  if grep -q '^[[:space:]]*predictor_n_blocks[[:space:]]*=' "$file"; then
+    sed -i '/^[[:space:]]*predictor_n_blocks[[:space:]]*=\s*\[/,/^[[:space:]]*]/d' "$file"
+    # sed -i '/^[[:space:]]*predictor_n_blocks[[:space:]]*=/d' "$file"
+    echo "   Remov predictor_n_blocks line"
+  fi
+  sed -i "/^\[space\.model\]/a predictor_n_blocks = [\n  \"_tune_\",\n  \"int\",\n  1,\n 4,\n]" "$file"
+  
+  #   # # delete num_heads
+  # if grep -q '^[[:space:]]*num_heads[[:space:]]*=' "$file"; then
+  #   sed -i '/^[[:space:]]*num_heads[[:space:]]*=/d' "$file"
+  #   echo "   Remov num_heads line"
+  # fi
+  # sed -i "/^\[space\.model\]/a num_heads = [\n  \"_tune_\",\n  \"int\",\n  4,\n 8,\n 4,\n]" "$file"
+  
+  
+  # add temperature as tuning parameter
+  # sed -i "/^\[space\.model\]/a temperature = [\n  \"_tune_\",\n  \"categorical\",\n  [0.01, 0.05, 0.1, 0.15, 0.2]\n]" "$file"
+  # echo "   Insert temperature tuning block"
 
+  # if grep -q '^[[:space:]]*dropout1[[:space:]]*=' "$file"; then
+  #   sed -i '/^[[:space:]]*dropout1[[:space:]]*=/d' "$file"
+  #   echo "   Remove dropout1 line"
+  # fi
+
+  # sed -i "/^\[space\.model\]/a dropout1 = [\n  \"_tune_\",\n  \"?uniform\",\n  0.0,\n 0.0,\n  0.6,\n]" "$file"
+  # echo "   Insert dropout1 tuning block"
+
+
+
+
+  # # 4) d_main
+  # sed -E -i "/^[[:space:]]*d_main *= *\\[/,/^[[:space:]]*\\]/ {
+  #   s/\"int\"/\"int-power-of-two\"/;
+  #   s/^([[:space:]]*)16,/\1 4,/;
+  #   s/^([[:space:]]*)96,/\1 6,/;
+  #   s/^([[:space:]]*)384,/\1 9,/;
+  # }" "$file"
+  # echo "   Updated d_main mapping"
+
+
+  #########################################################
+  # config for label bins
+
+#   sed -i '/^\[space\.label_bins\]/,/^\[/d' "$file"
+#   echo "   Removed old [space.label_bins] section"
+
+
+#   cat << 'EOF' >> "$file"
+
+# [space.label_bins]
+# n_bins = [
+#     "_tune_",
+#     "int",
+#     2,
+#     10,
+# ]
+# EOF
+#   echo "   Appended [space.bins] section"  
 done

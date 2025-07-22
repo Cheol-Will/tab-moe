@@ -1,25 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# src_type="retransformer-periodic"
+# src_type="qtabformer-query-4-key-k-value-ky-mqa-4-moh"
+src_type="qtabformer-query-4-key-k-value-ky-mqa"
+dest_type="qtabformer-query-4-key-k-value-ky-mqa-d4"
 
-src_type="reformer-d3-h4-m96-mqa"
-
-
-# src_type="reformer-d3-h4-m32"
-src_type="reformer-d1-h1-m32"
-# src_type="reformer-d1-m64"
-
-# src_type="reformer-d3-h4-m32-mqa"
-# dest_type="reformer-d3-h4-m32-mqa"
-# dest_type="reformer-d3-h4-m32-adapter"
-# dest_type="reformer-d3-h4-m32-mqa-adapter"
-# dest_type="reformer-d3-h4-m96"
-# dest_type="reformer-d3-h4-m64-mqa"
-dest_type="reformer-d1-h4-m32"
-
-
-# 1) Copy top-level tuning files if they don't already exist
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")
 for dataset in "${data_list[@]}"; do
     echo "Processing dataset: ${dataset}"
@@ -42,7 +27,7 @@ for dataset in "${data_list[@]}"; do
     fi
 done
 
-# 2) Copy tuning files under tabred or why if they don't already exist
+# 2) tabred or why dataset
 data_list=("tabred" "why")
 for dataset in "${data_list[@]}"; do
     echo "Processing dataset: ${dataset}"

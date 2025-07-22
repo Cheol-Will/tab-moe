@@ -334,7 +334,8 @@ class Model(nn.Module):
         if is_train:
             with torch.no_grad():
                 key_x = self.encoder_key(x)
-                y_encoded = self.label_encoder(y.unsqueeze(-1))
+            y_encoded = self.label_encoder(y.unsqueeze(-1))
+
         else:
             key_x = None
 

@@ -1,7 +1,7 @@
 import json
-from pathlib import Path
-from datetime import datetime
 import pandas as pd
+import numpy as np
+from pathlib import Path
 
 def get_dataset_name(dataset_path: str) -> str:
     name = dataset_path.removeprefix('data/')
@@ -11,159 +11,7 @@ def get_dataset_name(dataset_path: str) -> str:
         else name
     )
 
-def load_reports(model: str, report_type: str = 'evaluation') -> pd.DataFrame:
-    pattern = f'{model}/**/0-{report_type}/*/report.json'
-    json_files = list(Path('exp').glob(pattern))
-    if not json_files:
-        return pd.DataFrame()
-    
-    df = pd.json_normalize([
-        json.loads(x.read_text()) for x in json_files
-    ])
-    df['Dataset'] = df.get('config.data.path', df.get('best.config.data.path')).map(get_dataset_name)
-    return df
-
-def print_metrics(model):
-    df = load_reports(model)
-    if df.empty:
-        print(f"No data found for {model}")
-        return
-
-    df_agg = df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std'])
-    print(model, '-' * 50)
-    print(df_agg, '\n')
-
-def summary_metrics_table(model_list, data_list, output_path="output/metrics.csv", is_print=False, is_save=False):
-    all_results = {}
-    for model in model_list:
-        df = load_reports(model)
-        if df.empty:
-            continue
-
-        df_agg = df.groupby('Dataset')['metrics.test.score'].mean().reindex(data_list)
-        all_results[model] = df_agg
-
-    df_all = pd.DataFrame(all_results).T
-    if is_print:
-        print(df_all)
-    if is_save:
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        df_all.to_csv(output_path, float_format="%.4f")
-        print(f"Saved all model metrics to {output_path}")
-    return df_all
-
-def extract_hyperparameters(df, model):
-    base_params = [
-        'config.model.backbone.n_blocks',
-        'config.model.backbone.d_block',
-        'config.model.backbone.dropout',
-        'config.optimizer.lr',
-        'config.optimizer.weight_decay'
-    ]
-
-    moe_params = [
-        'config.model.backbone.k',
-        'config.model.backbone.moe_ratio',
-        'config.model.backbone.num_experts'
-    ]
-
-    default_k = ['config.model.k']
-    params = base_params + (moe_params if 'moe' in model else default_k)
-    selected = ['Dataset'] + [p for p in params if p in df.columns]
-
-    dfh = df[df['config.seed'] == 0][selected].copy()
-    if 'config.model.backbone.dropout' in dfh.columns:
-        dfh['has_dropout'] = (dfh['config.model.backbone.dropout'] > 0).astype(float)
-    if 'config.optimizer.weight_decay' in dfh.columns:
-        dfh['has_weight_decay'] = (dfh['config.optimizer.weight_decay'] > 0).astype(float)
-
-    return dfh.groupby('Dataset').mean()
-
-def summary_hyperparameters(model_list, output_path="output/average_hyperparameters.csv", is_print=False, is_save=False):
-    records = []
-    for model in model_list:
-        df = load_reports(model)
-        if df.empty:
-            continue
-
-        dfh = extract_hyperparameters(df, model)
-        if is_print:
-            print(model)
-            print(dfh)
-            print(dfh.mean(axis=0))
-            print()
-
-        avg_row = dfh.mean().rename(model)
-        records.append(avg_row)
-
-    if is_save and records:
-        df_all_avg = pd.DataFrame(records)
-        df_all_avg.index.name = "Model"
-        Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        df_all_avg.to_csv(output_path, float_format="%.4f")
-        print(f"Saved average hyperparameters of all models to {output_path}")
-
-def print_tuning_time(model):
-    df = load_reports(model, report_type='tuning')
-    if df.empty:
-        print(f"No tuning data found for {model}")
-        return
-    
-    df['time'] = pd.to_timedelta(df['time'])
-    total = df.groupby('Dataset')['time'].sum().sort_values()
-    print(model, '-' * 50)
-    print(total, '\n')
-    print("Total:", total.sum())
-    total.to_csv(f"searching_time_{model}.csv", header=["total_time"])
-
-def calculate_ranks(merged: pd.DataFrame, model_cols: list[str]) -> pd.DataFrame:
-    if model_cols is None:
-        model_cols = merged.columns
-        model_cols = model_cols.drop(["dataset", "direction"])
-    rank_df = pd.DataFrame(index=merged["dataset"], columns=model_cols, dtype=float)
-    n_models = len(model_cols)
-    for _, row in merged.iterrows():
-        asc = row["direction"] == "lower_is_better"
-        ranks = row[model_cols].rank(ascending=asc, method="min").fillna(n_models)
-        rank_df.loc[row["dataset"]] = ranks
-    return rank_df
-
-def merge_and_calculate_rank(model: str, benchmark_model : list[str] = None, data_list: list[str] = None, is_save: bool = False, is_print: bool = False, file_name: str = None) -> pd.DataFrame:
-    paper = pd.read_csv("output/paper_metrics.csv")
-    model = [model] if isinstance(model, str) else model
-    df = summary_metrics_table(model, data_list)
-    summary_t = df.T.reset_index().rename(columns={"Dataset": "dataset"})
-    merged = paper.merge(summary_t, on="dataset", how="left")
-    if data_list is not None:
-        merged = merged[merged["dataset"].isin(data_list)]
-    merged.drop(columns=["TabPFN"], inplace=True)
-
-    if "house" in merged["dataset"].values:
-        merged.loc[merged["dataset"] == "house", model] /= 10000
-
-    model_cols = [c for c in merged.columns if c not in ("dataset", "direction")]
-    if benchmark_model is not None:
-        model_cols = model + benchmark_model
-    # print(merged.columns)
-    merged = merged[['dataset', 'direction'] + model_cols]
-    merged[model_cols] = merged[model_cols].abs().round(4)
-
-    rank_df = calculate_ranks(merged, model_cols)
-    avg_rank = rank_df.mean(axis=0).sort_values()
-
-    if is_save:
-        merged.to_csv(f"output/metrics_merged_{file_name}.csv", index=False, float_format="%.4f")
-        avg_rank.to_csv(f"output/avg_rank_{file_name}.csv")
-        print(f"\nSaved merged metrics to output/metrics_merged_{file_name}.csv")
-    if is_print:
-        print(merged)
-        print(rank_df)
-        print(avg_rank)
-    return merged
-
-
-
-def load_benchmark_single(json_path: str) -> pd.DataFrame:
+def load_benchmark(json_path: str) -> pd.DataFrame:
     with open(json_path, 'r') as f:
         raw = json.load(f)
 
@@ -178,121 +26,358 @@ def load_benchmark_single(json_path: str) -> pd.DataFrame:
                 'mean':    m.get('single_model_mean'),
                 'std':     m.get('single_model_std')
             })
-    return pd.DataFrame.from_records(records)
-
-
-
-def main():
-    # model_list = [
-    #     # 'moe-sparse-piecewiselinear', 
-    #     # 'moe-sparse-shared-piecewiselinear',
-    #     # 'moe-mini-sparse-piecewiselinear',
-    #     # 'moe-mini-sparse-shared-piecewiselinear',
-    #     # 'tabrm-piecewiselinear', # Retrieval + Shared MLP
-    #     'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-    #     # 'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
-    #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-    #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini (Packed Batch ensemble)
-    #     # 'tabrmv3-cs-periodic',
-    #     # 'tabrmv3-mini-cs-periodic',
-    #     # 'tabrmv3-shared-cs-periodic'
-    #     # 'tabrmoev3-periodic',
-    #     # current -------------------------
-    #     'tabrmv3-mini-periodic',        
-    #     'tabrmoev3-periodic',
-    #     'tabrmv4-mini-periodic',        
-    #     'tabrmv4-shared-periodic',
-    #     'tabrmoev4-periodic',
-    #     # 'tabrmv4-moe-periodic',
-    # ]
-    # bench = [
-    #     'MLP',
-    #     'Excel-plugins',
-    #     'SAINT',
-    #     'FT-T',
-    #     'T2G',
-    #     'MNCA',
-    #     'TabR',
-    #     'MLP-piecewiselinear',
-    #     'LightGBM',
-    #     'XGBoost',
-    #     'CatBoost',
-    #     'MNCA-periodic',
-    #     'TabR-periodic',
-    #     'TabM',
-    #     'TabMmini-piecewiselinear',
-    # ]
-
-    # # merged = merge_and_calculate_rank(model=model_list, benchmark_model=benchmark_model, data_list=None, is_save=False, is_print=False)
-    # # filtered = merged[merged['tabrmv4-mini-periodic'].notna()]
+    df = pd.DataFrame.from_records(records)
+    df['dataset'] = df['dataset'].str.replace(' ', '_', regex=False) # replace ' ' into '_'
     
-    # target_model_list = [
-    #     # 'moe-sparse-piecewiselinear', 
-    #     # 'moe-mini-sparse-shared-piecewiselinear',
-    #     'tabrmv2-piecewiselinear',        
-    #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-    #     # 'tabrmv3-mini-periodic',        
-    #     # 'tabrmoev3-periodic',
-    #     'tabrmv4-mini-periodic',        
-    #     'tabrmv4-shared-periodic',
-    #     'tabrmoev4-periodic',
-    #     'tabrmoev4-drop-periodic',
-    #     'tabr-pln-periodic',
-    #     'reproduced-tabr-periodic',
-    # ]    
+    return df
 
-    # # target_model_list = [
-    # #     'tabrm-piecewiselinear', # Retrieval + Shared MLP
-    # #     'tabrmv2-piecewiselinear', # Retrieval + TabM (Batch ensemble)
-    # #     'tabrmv2-periodic', # Retrieval + TabM (Batch ensemble)
-    # #     'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-    # #     # 'tabrmv2-mini-piecewiselinear', # Retrieval + TabM-mini        
-    # # ]
-    # for target_model in target_model_list:
-    # # filter_model = 'tabrmv4-shared-periodic'
-    #     merged = merge_and_calculate_rank(model=[target_model], benchmark_model=bench, data_list=None, is_save=False, is_print=False)
-    #     # print(merged)
-    #     filtered = merged[merged[target_model].notna()]
-    #     filtered_rank =  calculate_ranks(merged=filtered, model_cols=None)
-    #     avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
-    #     avg_rank.to_csv(f"output/rank_for_ppt_{target_model}.csv")
-    #     # print(target_model)
-    #     # print(filtered)
-    #     # print(avg_rank)
-    #     # print()
-
-    # merged = merge_and_calculate_rank(model=target_model_list, benchmark_model=bench, data_list=None, is_save=False, is_print=False)
-    # # print(merged)
-    # filtered = merged[merged["tabrmv4-mini-periodic"].notna()]
+def load_target_single(model: str, report_type: str = 'evaluation') -> pd.DataFrame:
+    pattern = f'{model}/**/0-{report_type}/*/report.json'
+    json_files = list(Path('exp').glob(pattern))
+    if not json_files:
+        return pd.DataFrame()
     
-    # filtered_rank = calculate_ranks(merged=filtered, model_cols=None)
-    # avg_rank = filtered_rank.mean(axis=0).sort_values().round(4)
-    # filtered = filtered.T
+    df = pd.json_normalize([
+        json.loads(x.read_text()) for x in json_files
+    ])
     
-    # # print(filtered)
-    # # print(avg_rank)
-    # # file_name = datetime.now().strftime("%Y%m%d_%H%M%S")
-    # # file_name = "for_ppt_250708_1541"
-    # # filtered.to_csv(f"output/metrics_{file_name}.csv")
-    # # avg_rank.to_csv(f"output/ranks_{file_name}.csv")
-
-    # # filtered = merged[merged['tabrmoev3-periodic'].notna()]
+    df['dataset'] = df.get('config.data.path', df.get('best.config.data.path')).map(get_dataset_name)
+    df['metrics.test.score'] = df['metrics.test.score'].abs()
+    df.loc[df['dataset'] == 'house', 'metrics.test.score'] /= 10000 
     
-    # #
-    # #  filtered = merged[merged["tabrmv2-mini-periodic"].notna()]
-    # # filtered.to_csv("output/Temp_123.csv")
-    # # print(filtered.loc[:, ["dataset", "direction", "tabrmv2-periodic", "CatBoost", "TabMmini-piecewiselinear"]])
-    # df = load_benchmark_single("output/paper_metrics.json") 
-    # print(df)
+    df_agg = df.groupby('dataset')['metrics.test.score'].agg(['mean', 'std']).reset_index()
+    df_agg['method'] = model
 
-    # df_target = summary_metrics_table(model_list=target_model_list, data_list=None)
-    # print(df_target)
+    return df_agg
 
-    summary_hyperparameters(['tabm-mini-piecewiselinear'], is_print=True)
-    summary_hyperparameters(['tabm-piecewiselinear'], is_print=True)
-    # summary_hyperparameters(['tabpln-mini-piecewiselinear'], is_print=True)
-    # summary_hyperparameters(['taba-k128-piecewiselinear'], is_print=True)
 
+def merge_and_rank(
+    bench_long: pd.DataFrame,
+    tgt_long: pd.DataFrame,
+    direction_map: dict[str,str],
+    bench_models: list[str] = None,           
+) -> pd.DataFrame:
+    print(tgt_long.isna().sum())
+    if tgt_long is not None:
+        tgt = tgt_long.copy()
+        tgt['direction'] = tgt['dataset'].map(direction_map)
+
+        cols = ['dataset','direction','method','mean','std']
+        combined = pd.concat([bench_long[cols], tgt[cols]], ignore_index=True)
+
+        if bench_models is not None:
+            tgt_models = tgt['method'].unique().tolist()
+            allowed_models = set(bench_models) | set(tgt_models)
+            combined = combined[combined['method'].isin(allowed_models)]
+
+        allowed_datasets = tgt['dataset'].unique().tolist()
+        combined = combined[combined['dataset'].isin(allowed_datasets)]
+    else:
+        combined = bench_long
+        if bench_models is not None:
+            allowed_models = set(bench_models) 
+            combined = combined[combined['method'].isin(allowed_models)]
+        cols = ['dataset','direction','method','mean','std']
+        combined = combined[cols]
+
+
+    def rank_group(g):
+        direction = g['direction'].iat[0]
+        ascending = (direction == 'lower_is_better')
+        sg = g.sort_values('mean', ascending=ascending, na_position='last').reset_index(drop=True)
+        ranks = {}
+        ref_mean, ref_std = sg.loc[0, ['mean','std']]
+        curr_rank = 1
+        ranks[sg.loc[0,'method']] = curr_rank
+
+        for i in range(1, len(sg)):
+            mname = sg.loc[i,'method']
+            mmean = sg.loc[i,'mean']
+            mstd  = sg.loc[i,'std']
+            if pd.isna(mmean): 
+                raise ValueError(f'NAN')
+            if pd.isna(mstd):
+                mstd = 0
+            if direction == 'higher_is_better':
+                same_tier = (mmean >= ref_mean - ref_std)
+            else:
+                same_tier = (mmean <= ref_mean + ref_std)
+
+            if same_tier:
+                ranks[mname] = curr_rank
+            else:
+                curr_rank += 1
+                ref_mean, ref_std = mmean, mstd
+                ranks[mname] = curr_rank
+
+        return pd.Series(ranks)
+    rank_long = (
+        combined
+        .groupby('dataset', sort=False)
+        .apply(rank_group)
+        .reset_index()
+        .rename(columns={'level_1':'method', 0:'rank'})
+    )
+    high_ds = [ds for ds, dir_val in direction_map.items() if dir_val == 'higher_is_better']
+    low_ds  = [ds for ds, dir_val in direction_map.items() if dir_val == 'lower_is_better']
+
+    high_rank = rank_long[rank_long['dataset'].isin(high_ds)].reset_index(drop=True)
+    low_rank  = rank_long[rank_long['dataset'].isin(low_ds)].reset_index(drop=True)
+
+
+    return rank_long, high_rank, low_rank
+
+
+def pivot_rank(rank_long: pd.DataFrame) -> pd.DataFrame:
+    """
+    Transform a long-form rank DataFrame (dataset, method, rank)
+    into a wide-form matrix with:
+      - index = method (rows)
+      - columns = dataset
+      - values = rank
+
+    Missing ranks will be NaN.
+    """
+    # pivot
+    rank_wide = rank_long.pivot(
+        index='method',
+        columns='dataset',
+        values='rank'
+    )
+    # optional: sort methods and datasets
+    rank_wide = rank_wide.sort_index(axis=0).sort_index(axis=1)
+    return rank_wide
+
+
+def pivot_mean_std(
+    bench_long: pd.DataFrame,
+    tgt: pd.DataFrame,
+    bench_models: list[str] = None,
+    use_std: bool = True,
+) -> pd.DataFrame:
+    """
+    format string : mean_std
+    """
+
+    cols = ['dataset','method','mean','std']
+    combined = pd.concat([bench_long[cols], tgt[cols]], ignore_index=True)
+
+    if bench_models is not None:
+        tgt_models = tgt['method'].unique().tolist()
+        allowed_models = set(bench_models) | set(tgt_models)
+        combined = combined[combined['method'].isin(allowed_models)]
+
+    allowed_datasets = tgt['dataset'].unique().tolist()
+    combined = combined[combined['dataset'].isin(allowed_datasets)]
+
+    def fmt(row):
+        if not use_std:
+            if pd.isna(row['mean']):
+                return ""
+            else:
+                return f"{row['mean']:.4f}"
+        else:
+            if pd.isna(row['std']):
+                if pd.isna(row['mean']):
+                    return ""
+                else:
+                    return f"{row['mean']:.4f}"
+            else:
+                return f"{row['mean']:.4f}±{row['std']:.4f}"
+
+    combined['mean_std'] = combined.apply(fmt, axis=1)
+
+    pivot = combined.pivot(
+        index='method',
+        columns='dataset',
+        values='mean_std'
+    )
+
+    pivot.columns = [c.replace(" ", "_") for c in pivot.columns]
+
+    allowed_datasets = pivot.columns
+
+    return pivot
+
+
+def print_directions_one_line(direction_map, datasets):
+    # "churn: higher_is_better, adult: higher_is_better, …"
+    pairs = [f"{ds}: {direction_map.get(ds.replace('_', ' '), 'unknown')[:-10]}" for ds in datasets]
+    print(", ".join(pairs))
+
+def merge_tag(tgt, model2):
+    model2_tgt = load_target_single(model2)
+    main_datasets = tgt['dataset'].unique().tolist()
+    model2_tgt = model2_tgt[model2_tgt['dataset'].isin(main_datasets)]
+    tgt = pd.concat([tgt, model2_tgt], ignore_index=True)
+    return tgt
+
+
+def add_arrow(mean_std_table, direction_map):
+    """
+    Using direction map add upper arrow or lower arrow into dataset names (column)
+
+    """
+    rename_map = {}
+    for col in mean_std_table.columns:
+        ds_name = col.replace('_', ' ')
+        direction = direction_map.get(ds_name)
+        if direction == 'higher_is_better':
+            rename_map[col] = f"{col} ↑"
+        elif direction == 'lower_is_better':
+            rename_map[col] = f"{col} ↓"
+
+    return mean_std_table.rename(columns=rename_map)
 
 if __name__ == "__main__":
-    main()
+
+    target_models = [
+        # 'tabrmv2-piecewiselinear',        
+        # 'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
+        # 'tabrmv3-mini-periodic',        
+        # 'tabrmoev3-periodic',
+        # 'tabrmv4-mini-periodic',        
+        # 'tabrmv4-shared-periodic',
+        # 'tabrmoev4-periodic',
+        # 'tabrmoev4-drop-periodic',
+        # 'tabr-pln-periodic',
+        # 'reproduced-tabr-periodic',
+    ]
+    # tgt = load_target_single('rep-tabr-periodic')
+    # tgt = load_target_single('tabr-pln-multihead-periodic')
+    # tgt = load_target_single('retransformer-periodic')
+    
+    with open("output/paper_metrics.json", "r") as f:
+        raw = json.load(f)
+
+    direction_map = {
+        dataset: info["direction"]
+        for dataset, info in raw.items()
+    }
+
+    bench_models = [
+        'MLP', 
+        'MLP-piecewiselinear',
+        'SAINT', 'T2G',
+        'Excel-plugins',
+        'FT-T', 
+        'MNCA', 'TabR', 
+        'MNCA-periodic', 'TabR-periodic',
+        'LightGBM', 
+        'XGBoost', 
+        'CatBoost',
+        # 'TabM', 'TabMmini-piecewiselinear',
+    ]
+    model = "qreformer-deubg-d1-h1-m32"
+
+    # tgt = load_target_single(model)
+    # print(tgt.shape)
+    tgt = load_target_single(model)
+    bench = load_benchmark("output/paper_metrics.json")
+    reformer_list = [
+        # 'reformer-d1-h1-m32',
+        # 'qreformer-d1-h1-m32-aux',
+        # 'qreformer-d1-h1-m64',
+        # 'qreformer-d3-h4-m32',
+        # 'qreformer-d3-h4-m32-aux',
+        # 'qreformer-d3-h4-m64',
+        # 'qreformer-d3-h4-m32-mqa',
+        # 'qreformer-d3-h4-m32-adapter',
+        # 'qreformer-d3-h4-m32-mqa-adapter',
+        # 'qreformer-d3-h4-m96',
+        # 'qreformer-d3-h4-m64-mqa',
+        # 'qreformer-d3-h4-m96-mqa',
+        # "qreformer-d3-h4-m128-mqa",
+        # "qreformer-d1-h4-m32",
+        # 'retransformer-periodic',
+        # 'retransformer-aux-periodic',
+        # 'tabrm-periodic',
+        # "qreformer-deubg-d1-h1-m32",
+        "qreformer-deubg-d3-h4-m32",
+        # "qreformer-deubg-d3-h4-m96-mqa",
+        # "qreformer-deubg-d3-h4-m128-mqa",
+        ###################################
+        # "qtab-naive-sdp-t1",
+        # "qtab-naive-sdp-t02",
+        # "qtab-naive-sdp-t001",
+        # "qtab-naive-l2-t1",
+        # "qtab-naive-l2-t02",
+        # "qtab-naive-l2-t001",
+        # "qtab-naive-cossim-t01",
+        # "qtab-naive-cossim-t02",
+        # "qtab-naive-cossim-t001",
+        ###################################
+        # "qtabformer-key-k-value-k-cossim-t01",
+        # "qtabformer-key-k-value-ky-cossim-t01",
+        # "qtabformer-key-cossim-t001",
+        # "qtabformer-key-cossim-t002",
+        # "qtabformer-key-ky-value-ky-cossim-t01",
+        # "qtabformerv3-key-ky-value-ky-cossim-t01",
+        # "qtabformer-key-y-cossim-t01",
+        # "qtabformer-key-y-cossim-t001",        
+        # "qtabformer-key-y-cossim-t002",        
+        # "qtabformerv3-key-k-value-y-cossim-t01",
+        # "qtabformerv3-key-k-value-ky-cossim-t01",
+        # "qtabformerv4-key-ky-value-ky-cossim-t01",
+        # "qtabformer-key-k-value-ky-cossim",
+        # "qtabformer-key-ky-value-ky-cossim",
+        "qtab-naive-cossim",
+###########################################################
+        "qtabformer-query-1-key-k-value-ky-mha-4",
+        "qtabformer-query-4-key-k-value-ky-mha-4",
+        "qtabformer-query-8-key-k-value-ky-mha-4", #GPU1
+        "qtabformer-query-16-key-k-value-ky-mqa-4", # GPU\ 2
+        "qtabformer-query-1-key-k-value-ky-mqa-4",
+        "qtabformer-query-4-key-k-value-ky-mqa-4",
+        "qtabformer-query-8-key-k-value-ky-mqa-4", # GPU0
+
+        "qtabformer-query-4-key-k-value-ky-mha-8", # GPU0
+        "qtabformer-query-4-key-k-value-ky-mqa-8",
+
+###########################################################
+        
+        "qtabformer-query-4-key-k-value-ky-mha-4-moh",
+        "qtabformer-query-4-key-k-value-ky-mqa-4-moh",
+
+###########################################################
+        "qtabformer-query-4-key-k-value-ky-mqa",
+        "qtabformer-query-4-key-k-value-ky-mqa-moh",
+        "qtabformer-query-4-key-k-value-ky-mqa-d4",
+
+
+###########################################################
+        'tabm-piecewiselinear',
+        'tabm-mini-piecewiselinear',
+        'tabm'
+    ]
+    for model_name in reformer_list:
+        print(model_name)
+        tgt = merge_tag(tgt, model_name)
+    print(tgt)
+    # # print(bench)
+    ranks, clf_rank, reg_rank = merge_and_rank(bench, tgt, direction_map, bench_models)
+    # rank_list = [clf_rank, reg_rank, ranks]
+    rank_list = [ranks]
+    for rank in rank_list:
+        ranks_pivot = pivot_rank(rank)
+        print(ranks_pivot)
+
+        max_rank = ranks_pivot.max().max()  # 
+        ranks_pivot = ranks_pivot.fillna(max_rank + 1)
+        avg_ranked = ranks_pivot.mean(axis=1).sort_values()
+        mean_std_table = pivot_mean_std(bench, tgt, bench_models, use_std=False)
+        mean_std_table = add_arrow(mean_std_table, direction_map)
+
+        ranks_pivot = add_arrow(ranks_pivot, direction_map)
+
+        print(mean_std_table)
+
+        print("\nDataset directions:")
+        print()
+
+        print(avg_ranked)
+        print()
+
+        ranks_pivot.to_csv(f"output/ranks_for_ppt_250711_{model}.csv") 
+        mean_std_table.to_csv(f"output/metrics_for_ppt_250711_{model}.csv") 
+        avg_ranked.to_csv(f"output/avg_ranks_for_ppt_250711_{model}.csv") 

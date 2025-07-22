@@ -411,12 +411,6 @@ class Model(nn.Module):
         # 
         context_y_emb = self.label_encoder(candidate_y[context_idx][..., None]) # (B, K, D)
         values = context_y_emb + self.T(k[:, None] - context_k) # (B, K, D)
-
-        # >>> prediction
-        # add auxiliary loss for training.
-        
-        # Note that L2 distance is measured by K = self.K(x)
-        # cross attention is performed under x and values.        
         out = x
         for block in self.blocks1:
             out = block(out, context_x, values)
