@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# src_type="qtabformer-query-4-key-k-value-ky-mqa-4-moh"
 src_type="qtabformer-query-4-key-k-value-ky-mqa"
 dest_type="qtabformer-query-4-key-k-value-ky-mqa-d4"
 
