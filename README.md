@@ -96,7 +96,7 @@ If step is not given, it is set to 1 in default.
 
 
 ## Experiment Result
-To load the experiment result and rank statistics, add your model in exp_list in summary.py, and run summary.py.
+To load the experiment result and rank statistics, add your model in exp_list in `summary.py`, and run `summary.py`.
 It shows all metrics of models specified in exp_list and benchmarks and rank statistics. 
 
 ```
