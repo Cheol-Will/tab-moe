@@ -1,402 +1,6 @@
-# TabM: Advancing Tabular Deep Learning With Parameter-Efficient Ensembling (ICLR 2025)<!-- omit in toc -->
+# Deep models on Tabular Data
 
-:scroll: [arXiv](https://arxiv.org/abs/2410.24210)
-&nbsp; :computer: [Usage](#using-tabm-in-practice)
-&nbsp; :books: [Other tabular DL projects](https://github.com/yandex-research/rtdl)
-
-*TL;DR: TabM is a simple and powerful tabular DL architecture that efficiently imitates an ensemble of MLPs.*
-
-> [!TIP]
-> For a quick overview of the paper, see **the abstract, Figure 1 and Page 7** in the [PDF](https://arxiv.org/pdf/2410.24210).
-
-# Using TabM in practice
-
-To use TabM outside of this repository, you only need the following:
-
-- [`tabm_reference.py`](./tabm_reference.py): the minimal single-file implementation.
-- [`example.ipynb`](./example.ipynb): the end-to-end example of training TabM.
-- [The section about hyperparameters](#hyperparameters).
-
-To use `tabm_reference.py`, install the following dependencies:
-
-```
-torch>=2.0,<3
-rtdl_num_embeddings>=0.0.11,<0.1
-```
-
-Then, either clone this repository and add its path to `PYTHONPATH`,
-or simply copy `tabm_reference.py`. After that, the following will work:
-
-```python
-from tabm_reference import Model
-```
-
----
-
-Table of contents
-- [Using TabM in practice](#using-tabm-in-practice)
-- [Overview](#overview)
-  - [Models](#models)
-  - [Hyperparameters](#hyperparameters)
-  - [Metrics](#metrics)
-- [Set up the environment](#set-up-the-environment)
-  - [Software](#software)
-  - [Data](#data)
-  - [Quick test](#quick-test)
-  - [Editor settings](#editor-settings)
-- [Running the code](#running-the-code)
-  - [Code overview](#code-overview)
-  - [Common guidelines](#common-guidelines)
-  - [Training](#training)
-  - [Hyperparameter tuning](#hyperparameter-tuning)
-  - [Evaluation](#evaluation)
-  - [Ensembling](#ensembling)
-  - [Automating all of the above](#automating-all-of-the-above)
-- [Adding new datasets](#adding-new-datasets)
-- [How to cite](#how-to-cite)
-
-
-
----
-
-# Overview
-
-The repository provides:
-- The official implementation of the TabM and MLP models.
-- The code for training and hyperparameter tuning used in the paper.
-- Hyperparameter tuning spaces, tuned hyperparameters and metrics of the models on all 40+ datasets
-  used in the paper.
-
-## Models
-
-The following models are available in this repository.
-
-> [!TIP]
-> Among the TabM models, the following variations are recommended as a starting point:
-> - $\mathrm{TabM}$ as the basic version.
-> - $\mathrm{TabM_{mini}^\dagger}$ as the advanced version.
-
-| Name                            | Comment                                                  |
-| :------------------------------ | :------------------------------------------------------- |
-| $\mathrm{MLP}$                  | The plain multilayer perceptron (MLP)                    |
-| $\mathrm{MLP^\dagger}$          | MLP with the piecewise-linear embeddings                 |
-| $\mathrm{MLP^\ddagger}$         | MLP with the periodic embeddings (also known as MLP-PLR) |
-| $\mathrm{MLP^{\ddagger(lite)}}$ | MLP with the lite periodic embeddings                    |
-| $\mathrm{TabM}$                 | TabM                                                     |
-| $\mathrm{TabM_{mini}}$          | TabM-mini                                                |
-| $\mathrm{TabM_{packed}}$        | TabM-packed                                              |
-| $\mathrm{TabM^\dagger}$         | TabM with the piecewise-linear embeddings                |
-| $\mathrm{TabM_{mini}^\dagger}$  | TabM-mini with the piecewise-linear embeddings           |
-
-## Hyperparameters
-
-This section covers default hyperparameters and hyperparameter tuning.
-
-**Default hyperparameters**
-
-While there are no "official" default hyperparameters, the available tuned hyperparameters
-on 40+ dataset allow obtaining a reasonable configuration for the first run.
-
-<details>
-<summary>Show how</summary>
-
-```python
-import json
-from pathlib import Path
-
-import pandas as pd
-
-model = 'tabm'  # Or any other model from the exp/ directory.
-
-# Load all training runs.
-df = pd.json_normalize([
-    json.loads(x.read_text())
-    for x in Path('exp').glob(f'{model}/**/0-evaluation/*/report.json')
-])
-print(df.shape)  # (1290, 181)
-df.head()
-
-def get_dataset_name(dataset_path: str) -> str:
-    """
-    >>> get_dataset_name('data/california')
-    'california'
-    >>> get_dataset_name('data/regression-num-large-0-year')
-    'year'
-    """
-    name = dataset_path.removeprefix('data/')
-    return (
-        name.split('-', 4)[-1]  # The "why" benchmark.
-        if name.startswith(('classif-', 'regression-'))
-        else name
-    )
-
-
-df['Dataset'] = df['config.data.path'].map(get_dataset_name)
-
-# The hyperparameters.
-hyperparameters = [
-    'config.model.k',
-    'config.model.backbone.n_blocks',
-    'config.model.backbone.d_block',
-    'config.model.backbone.dropout',
-    'config.optimizer.lr',
-    'config.optimizer.weight_decay',
-]
-
-# When summarizing hyperparameters (but not metrics),
-# it is enough to keep only one seed per dataset.
-dfh = df.loc[df['config.seed'] == 0, ['Dataset', *hyperparameters]]
-
-# Add additional "hyperparameters".
-dfh['has_dropout'] = (dfh['config.model.backbone.dropout'] > 0).astype(float)
-dfh['has_weight_decay'] = (dfh['config.optimizer.weight_decay'] > 0).astype(float)
-
-# Some datasets have multiple splits, so they must be aggregated first.
-dfh = dfh.groupby('Dataset').mean()
-
-# Finally, compute the statistics.
-# NOTE: it is important to take all statistics into account, especially the quantiles,
-# not only the mean value, because the latter is not robust to outliers.
-dfh.describe()
-```
-
-**Additional notes**
-
-First, the above approach is not expected to result in a universally powerful configuration.
-Generally, the more robust to hyperparameters the model is, the higher is the chance
-to compose a configuration that will be a reasonable starting point on a larger number of datasets.
-
-Second, when computing the above statistics,
-a seemingly natural idea is to use only those datasets that are more similar to the task at hand.
-Also, not all used datasets are equally representative for the real world usage.
-However, deciding if a given dataset is relevant for the target task is not trivial.
-For example, generally, filtering datasets by size may not be a reliable criteria.
-
-One idea is to split datasets into different groups,
-compute statistics separately for each group, and thus get better intuition on hyperparameters.
-Examples of groups:
-- By split type: "datasets with random splits" and "datasets with domain-aware splits"
-  (this separation is used in the paper).
-- By GBDT/DL-friendliness: "datasets where GBDT performs well" and "datasets where DL performs well".
-- etc.
-
-</details>
-
-Based on the above approach, the following configurations can be suggested as a starting point
-for TabM with the AdamW optimizer:
-
-> [!NOTE]
-> The suggested hyperparameters may change in the future.
-
-| Hyperparameter | $\mathrm{TabM}$ |
-| :------------- | :-------------- |
-| `k`            | 32              |
-| Depth          | 3               |
-| Width          | 512             |
-| Dropout        | 0.1             |
-| Learning rate  | 0.002           |
-| Weight decay   | 0.0003          |
-
-When using embeddings for numerical features as in $\mathrm{TabM_{mini}^\dagger}$, the default
-depth can be reduced to $2$.
-
-**Hyperparameter tuning**
-
-> [!NOTE]
-> This section only provides general advice on hyperparameter tuning.
-> Running the hyperparameter tuning code used in the paper is discussed later in this document, and requires setting up the environment.
-
-If achieving the highest possible performance is not critical,
-then 30-50 iterations of the [TPE sampler from Optuna](https://optuna.readthedocs.io/en/stable/reference/samplers/generated/optuna.samplers.TPESampler.html) should result in a somewhat reasonable configuration.
-It the paper:
-- For MLP, 100 iterations were used.
-- For TabM, 100 iterations were used on smaller datasets, and 50 iterations on larger datasets.
-
-## Metrics
-
-The published results allow easily summarizing the metrics of the models on all datasets.
-
-<details>
-<summary>Show how</summary>
-
-```python
-import json
-from pathlib import Path
-
-import pandas as pd
-
-def get_dataset_name(dataset_path: str) -> str:
-    """
-    >>> get_dataset_name('data/california')
-    'california'
-    >>> get_dataset_name('data/regression-num-large-0-year')
-    'year'
-    """
-    name = dataset_path.removeprefix('data/')
-    return (
-        name.split('-', 4)[-1]  # The "why" benchmark.
-        if name.startswith(('classif-', 'regression-'))
-        else name
-    )
-
-model = 'tabm'  # Or any other model from the exp/ directory.
-
-# Load all training runs.
-df = pd.json_normalize([
-    json.loads(x.read_text())
-    for x in Path('exp').glob(f'{model}/**/0-evaluation/*/report.json')
-])
-df['Dataset'] = df['config.data.path'].map(get_dataset_name)
-
-# Aggregate the results over the random seeds.
-print(df.groupby('Dataset')['metrics.test.score'].agg(['mean', 'std']))
-```
-
-The output exactly matches the metrics reported in the very last section of the paper:
-
-```
-                                             mean         std
-Dataset                                                      
-Ailerons                                -0.000157    0.000002
-Bike_Sharing_Demand                    -42.108096    0.501597
-Brazilian_houses                        -0.044310    0.021299
-KDDCup09_upselling                       0.800227    0.010331
-MagicTelescope                           0.860680    0.005765
-Mercedes_Benz_Greener_Manufacturing     -8.221496    0.894050
-MiamiHousing2016                        -0.148294    0.003001
-MiniBooNE                                0.950001    0.000545
-OnlineNewsPopularity                    -0.858395    0.000325
-SGEMM_GPU_kernel_performance            -0.015809    0.000385
-adult                                    0.858158    0.001100
-analcatdata_supreme                     -0.077736    0.009874
-bank-marketing                           0.790799    0.006795
-black-friday                            -0.687502    0.001464
-california                              -0.450932    0.003154
-churn                                    0.861300    0.002463
-cooking-time                            -0.480330    0.000587
-covtype2                                 0.971188    0.000800
-cpu_act                                 -2.193951    0.052341
-credit                                   0.775121    0.004241
-delivery-eta                            -0.550962    0.001511
-diamond                                 -0.134209    0.001725
-ecom-offers                              0.594809    0.000557
-elevators                               -0.001853    0.000025
-fifa                                    -0.797377    0.014414
-higgs-small                              0.738256    0.002775
-homecredit-default                       0.858349    0.001019
-homesite-insurance                       0.964121    0.000401
-house                               -30002.387181  181.962989
-house_sales                             -0.169186    0.001056
-isolet                                  -1.883108    0.119444
-jannis                                   0.806610    0.001525
-kdd_ipums_la_97-small                    0.884546    0.006317
-maps-routing                            -0.161169    0.000120
-medical_charges                         -0.081265    0.000052
-microsoft                               -0.743353    0.000265
-nyc-taxi-green-dec-2016                 -0.386578    0.000596
-otto                                     0.826756    0.001436
-particulate-matter-ukair-2017           -0.368573    0.000628
-phoneme                                  0.870065    0.016701
-pol                                     -3.359482    0.401706
-road-safety                              0.794583    0.001253
-sberbank-housing                        -0.246943    0.003539
-sulfur                                  -0.019162    0.003538
-superconduct                           -10.337929    0.033769
-visualizing_soil                        -0.124183    0.018830
-weather                                 -1.478620    0.003926
-wine                                     0.796127    0.013558
-wine_quality                            -0.616949    0.012259
-year                                    -8.870127    0.011037
-```
-
-</details>
-
-# Set up the environment
-
-## Software
-
-Clone the repository:
-
-```shell
-git clone https://github.com/yandex-research/tabm
-cd tabm
-```
-
-Install any of the following tools, and follow the remaining instructions.
-
-| Tool                                                                                           | Supported OS | Supported devices |
-| :--------------------------------------------------------------------------------------------- | :----------- | :---------------- |
-| [Pixi](https://pixi.sh/latest/#installation)                                                   | Linux, macOS | CPU, GPU          |
-| [Micromamba](https://mamba.readthedocs.io/en/latest/installation/micromamba-installation.html) | Linux        | GPU               |
-| [Mamba](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html)           | Linux        | GPU               |
-| [Conda](https://conda-forge.org/download/)                                                     | Linux        | GPU               |
-
-<details>
-<summary>What is Pixi?</summary>
-
-Pixi is a high-level tool built on top of Conda environments.
-
-*The main benefits:*
-
-- **Pixi allows running the code seamlessly across different operating systems, with and without GPUs**
-  (this projects supports only Linux and macOS).
-- **Pixi guarantees that you and your collaborators will always have exactly the same Conda environment.**
-  If anyone adds/removes/updates a package, the enviroment is updated for all collaborators through the `pixi.lock` file.
-  In particular, you will have exactly the same environment as us, the original authors.
-
-*Technical details:*
-
-- **Pixi is a single binary file that can be downloaded and run as-is.**
-  Thus, Pixi will not affect your current installations of pip, uv, conda, and of any other tools.
-- **Pixi will automatically create and manage Conda environments in the `.pixi` folder right in the root of this repository.** No need for manually creating the environment,
-  installing packages, etc. At any moment, it is totally safe to remove the `.pixi` directory from the root of this repository.
-- **All Pixi commands must be run from the root of the repository.**
-
-For more details, see the official Pixi documentation.
-
-</details>
-
-With Pixi, the environment will be created automatically
-when you do `pixi run` or `pixi shell` for the first time. For example, try:
-
-```shell
-# Running commands in the environment with GPU
-pixi run -e cuda python -c "import torch; print(torch.cuda.is_available())"
-
-# Running commands in the CPU-only environment
-pixi run python --version
-```
-
-Or, if you prefer the Conda style workflow:
-
-```shell
-# Activate the environment with GPU
-pixi shell -e cuda
-
-# Activate the CPU-only environment
-pixi shell
-
-# Running commands (without `pixi run`)
-python --version
-
-# Deactivate the environment
-exit
-```
-
-With Micromamba:
-
-```
-micromamba create -f environment.yaml
-micromamba activate tabm
-```
-
-With Mamba:
-
-```
-mamba create -f environment.yaml
-mamba activate tabm
-```
-
+# Setup environment
 With Conda:
 
 ```
@@ -404,77 +8,139 @@ conda create -f environment.yaml -n tabm
 conda activate tabm
 ```
 
-## Data
-
-***License:** we do not impose any new license restrictions in addition to the original licenses of the used dataset. See the paper to learn about the dataset sources.*
-
-The data consists of two parts.
-
-**Part 1.** Go to the root of the repository and run:
-
-```
-mkdir local
-wget https://huggingface.co/datasets/rototoHF/tabm-data/resolve/main/data.tar -O local/tabm-data.tar.gz
-mkdir data
-tar -xvf local/tabm-data.tar.gz -C data
-```
-
-**Part 2.** Create the `local` directory
-and download the [TabReD](https://github.com/yandex-research/tabred) benchmark to `local/tabred`
-(you will need an account on Kaggle).
-Then, run:
-
-```
-python tools/prepare_tabred.py local/tabred data
-```
-
-## Quick test
-
-To check that the environment is configured correctly,
-run the following command and wait for the training to finish.
-Please, note:
-- The first run in a newly created environment can be (very) slow to start.
-- The results of the experiment will not be representative.
-  It is needed only to test the environment.
-
-```shell
-# Pixi with GPU
-pixi run -e cuda python bin/model.py exp/debug/0.toml --force
-
-# Pixi without GPU
-pixi run python bin/model.py exp/debug/0.toml --force
-
-# Without Pixi
-python bin/model.py exp/debug/0.toml --force
-```
-
-The last line of the output log should look like this:
-```
-[<<<] exp/debug/0 | <date & time>
-```
-
-## Editor settings
-
-To make the Python language server more responsive, it is recommended to hide the `exp`
-directory from the language server. For example, in Visual Studio Code, this can be achieved
-by adding the following to the local `.vscode/settings.json` file of this project:
-
-```jsonc
-{
-    // NOTE
-    // If this setting is already configured on the user level,
-    // you may need to duplicate the user-level values here.
-    "python.analysis.exclude": [ "**/exp" ],
-}
-```
-
 # Running the code
 
-This section will be useful if you are planning any of the following:
+`bin/go.py` performs hyperparameter tuning, evaluation with best hyperparameter on 15 different seeds, and reports ensemble result via bin/tune.py, bin/evaluate.py, and bin/ensemble.py, respectively.
 
-- Reproducing the results from the paper.
-- Tuning and training the models on custom datasets.
-- Using this repository as a starting point for future work.
+> Our main focus is the average metric from best hyperparameter on 15 different seeds (result of bin/evaluate.py)
+
+You can run bin/go.py with the specified model in arch_list on data_list (6 dataset) as follows.
+
+```
+bash _run_go_subset.sh
+```
+
+
+For example, If the specified model is "qtabformer-query-4-key-k-value-ky-mqa" and current dataset is adult, then it finds below 0-tuning.toml
+
+```
+exp/
+  <qtabformer-query-4-key-k-value-ky-mqa>/
+    <adult>/       # Or why/<dataset> or tabred/<dataset>
+      0-tuning.toml  # The hyperparameter tuning config
+      0-tuning/      # The result of the hyperparameter tuning
+      0-evaluation/  # The evaluation under multiple random seeds
+```
+
+If the dataset is one of why or tabred, then it finds one more depth.
+
+```
+exp/
+  <qtabformer-query-4-key-k-value-ky-mqa>/
+    <why>/       # Or why/<dataset> or tabred/<dataset>
+      <classif-num-medium-0-credit>/
+        0-tuning.toml  # The hyperparameter tuning config
+        0-tuning/      # The result of the hyperparameter tuning
+        0-evaluation/  # The evaluation under multiple random seeds
+```
+With 0-tuning.toml, hyperparameter tuning is performed. 
+
+To setup the 0-tuning.toml for all dataset, set your experiment directory in _copy_toml.sh, and run _copy_toml.sh
+
+From src_type, it will copy all necessary configs to dest_type. Configs include model, data path, hyperparameters. However, you need to modify your experiement's hyperparameters.
+```
+src_type="qtabformer-query-4-key-k-value-ky-mqa"
+dest_type="qtabformer-exp1"
+```
+
+```
+bash _copy_toml.sh
+```
+
+In 0-tuning.toml, the model and its script code is specified as follows.
+
+```
+function = "bin.qtabformer.main"
+```
+
+You can choose to tune or not as follows:
+
+```
+momentum = 0.999
+d_main = [
+    "_tune_",
+    "int-power-of-two",
+     6,
+     9,
+]
+num_heads = [
+  "_tune_",
+  "int",
+  4,
+ 8,
+ 4,
+]
+dropout0 = [
+    "_tune_",
+    "?uniform",
+    0.0,
+    0.0,
+    0.6,
+]
+```
+- momentum: fixed to 0.999.
+- d_main: sampled from [64, 128, 256, 512].
+- num_heads: is sampled from [4, 8], three arguments are min, max, and step, respectively.
+If step is not given, it is set to 1 in default.
+- dropout0: sampled from [0.0, 0.6]. when "?uniform" is used, it can choose NO Dropout (eqaul to 0.0 (first argument is default)).
+
+
+## Experiment Result
+To load the experiment result and rank statistics, add your model in exp_list in summary.py, and run summary.py.
+It shows all metrics of models specified in exp_list and benchmarks and rank statistics. 
+
+```
+exp_list = [
+  ...,
+  YOUR_MODEL_NAME,
+]
+```
+
+```
+python summary.py
+```
+
+The outputs as as follows:
+```
+          OnlineNewsPopularity ↓ churn ↑ credit ↑ ecom-offers ↑ medical_charges ↓ sberbank-housing ↓
+method                                                                                                                                
+CatBoost                0.8532  0.8582   0.7734        0.5596            0.0816             0.2482
+Excel-plugins           0.8605  0.8618   0.7724        0.5759            0.0817             0.2533
+FT-T                    0.8629  0.8593   0.7745        0.5775            0.0814             0.2440
+LightGBM                0.8546  0.8600   0.7686        0.5758            0.0820             0.2468
+MLP                     0.8643  0.8553   0.7735        0.5989            0.0816             0.2529
+MLP-piecewiselinear     0.8585  0.8580   0.7758        0.5949            0.0812             0.2383
+MNCA                    0.8651  0.8595   0.7739        0.5765            0.0811             0.2593
+MNCA-periodic           0.8647  0.8606   0.7734        0.5758            0.0809             0.2448
+SAINT                   0.8600  0.8603   0.7739        0.5812            0.0814             0.2467
+YOUR_MODEL              0.8600  0.8603   0.7739        0.5812            0.0814             0.2467
+...
+
+method                                              RANK
+tabm-piecewiselinear                            1.833333
+tabm-mini-piecewiselinear                       2.166667
+tabm                                            2.833333
+MLP-piecewiselinear                             2.833333
+CatBoost                                        3.500000
+XGBoost                                         3.666667
+LightGBM                                        3.833333
+MNCA-periodic                                   3.833333
+TabR-periodic                                   4.000000
+SAINT                                           4.166667
+FT-T                                            4.166667
+T2G                                             4.166667
+YOUR_MODEL                                      4.333333
+```
 
 ## Code overview
 
@@ -500,35 +166,6 @@ exp/
       0-evaluation/  # The evaluation under multiple random seeds
 ```
 
-**Models**
-
-All available models are represented by the `Model` class from `bin/model.py`.
-They differ in the `arch_type`, `k`, `num_embeddings` and `bins` arguments.
-The values for these arguments can be inferred from the TOML configs in the `exp` directory,
-and from the `bin/model.py` script, where `Model` is used.
-
-The following table is the mapping between the models and their subdirectories in `exp`.
-
-| Model                                       | Experiments                                           |
-| :------------------------------------------ | :---------------------------------------------------- |
-| $\mathrm{MLP}$                              | `exp/mlp`                                             |
-| $\mathrm{MLP^\dagger}$                      | `exp/mlp-piecewiselinear`                             |
-| $\mathrm{MLP^\ddagger}$                     | `exp/mlp-periodic`                                    |
-| $\mathrm{MLP^{\ddagger(lite)}}$             | `exp/mlp-periodiclite`                                |
-| $\mathrm{TabM}$                             | `exp/tabm`                                            |
-| $\mathrm{TabM_{mini}}$                      | `exp/tabm-mini`                                       |
-| $\mathrm{TabM_{packed}}$                    | `exp/tabm-packed`                                     |
-| $\mathrm{TabM^\dagger}$                     | `exp/tabm-piecewiselinear`                            |
-| $\mathrm{TabM_{mini}^\dagger}$              | `exp/tabm-mini-piecewiselinear`                       |
-| $\mathrm{TabM^\spadesuit}$                  | `exp/tabm-sharetrainingbatches`                       |
-| $\mathrm{TabM_{mini}^\spadesuit}$           | `exp/tabm-sharetrainingbatches-mini`                  |
-| $\mathrm{TabM^{\dagger \spadesuit}}$        | `exp/tabm-sharetrainingbatches--piecewiselinear`      |
-| $\mathrm{TabM_{mini}^{\dagger \spadesuit}}$ | `exp/tabm-sharetrainingbatches--mini-piecewiselinear` |
-
-## Common guidelines
-
-On your first reading, feel free to skip this section.
-
 <details>
 <summary>Show</summary>
 
@@ -545,22 +182,10 @@ On your first reading, feel free to skip this section.
 
 </details>
 
-## Training
-
-To train a model once, compose a TOML config with hyperparameters and pass it to `bin/model.py`.
-For example, the following command reproduces one training run of TabM on the California Housing dataset:
-
-```
-mkdir -p exp/reproduce/train-once
-cp exp/tabm/california/0-evaluation/0.toml exp/reproduce/train-once/
-python bin/model.py exp/reproduce/train-once/0.toml
-```
-
-The output will be located in the `0` directory next to the TOML config.
 
 ## Hyperparameter tuning
 
-Use `bin/tune.py` to tune hyperparameters for `bin/model.py`.
+Use `bin/tune.py` to tune hyperparameters for `bin/model.py` or `bin/qtabformer.py`.
 For example, the following commands reproduce the hyperparameter runing of TabM on the California Housing dataset
 (this takes around one hour on NVIDIA A100):
 
@@ -590,74 +215,10 @@ For example:
 python bin/evaluate.py exp/<any/path>/0-evaluation --function "bin.model.main"
 ```
 
-## Ensembling
-
-Use `bin/ensemble.py` to compute metrics for an ensemble of *already trained* models.
-For example, the following command evaluates an ensemble of the evaluated TabM from the previous section:
-
-```
-python bin/ensemble.py exp/reproduce/tabm/california/0-evaluation
-```
-
 ## Automating all of the above
 
 Use `bin/go.py` to run hyperparameter tuning, evaluation and ensembling with a single command.
 For example, all the above steps can be implemented as follows:
-
-```
-mkdir -p exp/reproduce/tabm-go/california
-cp exp/tabm/california/0-tuning.toml exp/reproduce/tabm-go/california
-
-python bin/go.py exp/reproduce/tabm-go/california/0-tuning --continue
-```
-
-# Adding new datasets
-
-*New datasets must follow the layout and NumPy data types of the datasets in `data/`.*
-
-Let's assume your dataset is called `my-dataset`.
-Then, create the `data/my-dataset` directory with the following layout:
-
-```
-data/
-  my-dataset/
-    # Continuous features, if presented
-    # NumPy data type: np.float32
-    X_num_train.npy
-    X_num_val.npy
-    X_num_test.npy
-
-    # Categorical features, if presented
-    # NumPy data type: np.str_ (i.e. string)
-    X_cat_train.npy
-    X_cat_val.npy
-    X_cat_test.npy
-
-    # Binary features, if presented
-    # NumPy data type: np.float32
-    X_bin_train.npy
-    X_bin_val.npy
-    X_bin_test.npy
-
-    # Labels
-    # NumPy data type (regression): np.float32
-    # NumPy data type (classification): np.int64
-    Y_train.npy
-    Y_val.npy
-    Y_test.npy
-
-    # Dataset information in the JSON format:
-    # {
-    #     (required) "task_type": < "regression" or "binclass" or "multiclass"     >,
-    #     (optional) "name":      < The full dataset name, e.g. "My Dataset"       >,
-    #     (optional) "id":        < Any string unique across all datasets in data/ >
-    # 
-    # }
-    info.json
-
-    # Just an empty file
-    READY
-```
 
 # How to cite
 

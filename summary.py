@@ -230,22 +230,6 @@ def add_arrow(mean_std_table, direction_map):
     return mean_std_table.rename(columns=rename_map)
 
 if __name__ == "__main__":
-
-    target_models = [
-        # 'tabrmv2-piecewiselinear',        
-        # 'tabrmv2-mini-periodic', # Retrieval + TabM-mini (Mini ensemble)
-        # 'tabrmv3-mini-periodic',        
-        # 'tabrmoev3-periodic',
-        # 'tabrmv4-mini-periodic',        
-        # 'tabrmv4-shared-periodic',
-        # 'tabrmoev4-periodic',
-        # 'tabrmoev4-drop-periodic',
-        # 'tabr-pln-periodic',
-        # 'reproduced-tabr-periodic',
-    ]
-    # tgt = load_target_single('rep-tabr-periodic')
-    # tgt = load_target_single('tabr-pln-multihead-periodic')
-    # tgt = load_target_single('retransformer-periodic')
     
     with open("output/paper_metrics.json", "r") as f:
         raw = json.load(f)
@@ -274,7 +258,7 @@ if __name__ == "__main__":
     # print(tgt.shape)
     tgt = load_target_single(model)
     bench = load_benchmark("output/paper_metrics.json")
-    reformer_list = [
+    exp_list = [
         # 'reformer-d1-h1-m32',
         # 'qreformer-d1-h1-m32-aux',
         # 'qreformer-d1-h1-m64',
@@ -350,7 +334,7 @@ if __name__ == "__main__":
         'tabm-mini-piecewiselinear',
         'tabm'
     ]
-    for model_name in reformer_list:
+    for model_name in exp_list:
         print(model_name)
         tgt = merge_tag(tgt, model_name)
     print(tgt)
