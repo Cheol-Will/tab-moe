@@ -11,18 +11,23 @@ arch_list=(
   # "qraugmlp-key-k-value-ky-m32" # GPU 2
   # "qtab-naive-cossim-cl" # GPU 0
   # "qraugresnet-key-k-value-ky-m32"
-  "qraugresnet-key-k-value-qky-m32" # GPU 2
+
+  # "qraugresnet-key-k-value-qky-m32" # GPU 2
+
+  "qtabformer-query-1-key-k-value-ky-mqa-moh" # GPU 0
+  # "qtabformer-query-4-key-k-value-ky-mqa-moh" # GPU 1, 2 
+
 )
 
 data_list=(
-  ## regression
+  # regression
   "tabred/sberbank-housing"
-  "why/regression-num-medium-0-medical_charges"
-  "why/regression-cat-medium-0-OnlineNewsPopularity/"
+  "why/regression-num-medium-0-medical_charges" # GPU 1
+  "why/regression-cat-medium-0-OnlineNewsPopularity/" # GPU 2
 
   ## classification
   "churn"
-  "tabred/ecom-offers"
+  "tabred/ecom-offers" # GPU 0
   "why/classif-num-medium-0-credit"
 
 )

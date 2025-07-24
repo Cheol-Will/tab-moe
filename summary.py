@@ -245,7 +245,7 @@ if __name__ == "__main__":
         'SAINT', 'T2G',
         'Excel-plugins',
         'FT-T', 
-        'MNCA', 'TabR', 
+        # 'MNCA', 'TabR', 
         'MNCA-periodic', 'TabR-periodic',
         'LightGBM', 
         'XGBoost', 
@@ -253,6 +253,7 @@ if __name__ == "__main__":
         # 'TabM', 'TabMmini-piecewiselinear',
     ]
     model = "qreformer-deubg-d1-h1-m32"
+    # model = "qtabformer-query-4-key-k-value-ky-mqa-moh"
     # model = "qtabformer-query-4-key-k-value-ky-mqa"
     # tgt = load_target_single(model)
     # print(tgt.shape)
@@ -277,34 +278,35 @@ if __name__ == "__main__":
         # 'retransformer-aux-periodic',
         # 'tabrm-periodic',
         # "qreformer-deubg-d1-h1-m32",
-        "qreformer-deubg-d3-h4-m32",
+        # "qreformer-deubg-d1-h1-m32",
+        # "qreformer-deubg-d3-h4-m32",
         # "qreformer-deubg-d3-h4-m96-mqa",
         # "qreformer-deubg-d3-h4-m128-mqa",
         ###################################
-        "qtab-naive-sdp-t1",
-        "qtab-naive-sdp-t02",
-        "qtab-naive-sdp-t001",
-        "qtab-naive-l2-t1",
-        "qtab-naive-l2-t02",
-        "qtab-naive-l2-t001",
-        "qtab-naive-cossim-t01",
-        "qtab-naive-cossim-t02",
-        "qtab-naive-cossim-t001",
+        # "qtab-naive-sdp-t1",
+        # "qtab-naive-sdp-t02",
+        # "qtab-naive-sdp-t001",
+        # "qtab-naive-l2-t1",
+        # "qtab-naive-l2-t02",
+        # "qtab-naive-l2-t001",
+        # "qtab-naive-cossim-t01",
+        # "qtab-naive-cossim-t02",
+        # "qtab-naive-cossim-t001",
         ###################################
-        "qtabformer-key-k-value-k-cossim-t01",
-        "qtabformer-key-k-value-ky-cossim-t01",
-        "qtabformer-key-cossim-t001",
-        "qtabformer-key-cossim-t002",
-        "qtabformer-key-ky-value-ky-cossim-t01",
-        "qtabformerv3-key-ky-value-ky-cossim-t01",
+        # "qtabformer-key-k-value-k-cossim-t01",
+        # "qtabformer-key-k-value-ky-cossim-t01",
+        # "qtabformer-key-cossim-t001",
+        # "qtabformer-key-cossim-t002",
+        # "qtabformer-key-ky-value-ky-cossim-t01",
+        # "qtabformerv3-key-ky-value-ky-cossim-t01",
         # "qtabformer-key-y-cossim-t01",
-        "qtabformer-key-y-cossim-t001",        
-        "qtabformer-key-y-cossim-t002",        
-        "qtabformerv3-key-k-value-y-cossim-t01",
-        "qtabformerv3-key-k-value-ky-cossim-t01",
-        "qtabformerv4-key-ky-value-ky-cossim-t01",
-        "qtabformer-key-k-value-ky-cossim",
-        "qtabformer-key-ky-value-ky-cossim",
+        # "qtabformer-key-y-cossim-t001",        
+        # "qtabformer-key-y-cossim-t002",        
+        # "qtabformerv3-key-k-value-y-cossim-t01",
+        # "qtabformerv3-key-k-value-ky-cossim-t01",
+        # "qtabformerv4-key-ky-value-ky-cossim-t01",
+        # "qtabformer-key-k-value-ky-cossim",
+        # "qtabformer-key-ky-value-ky-cossim",
         "qtab-naive-cossim",
         "qtab-naive-cossim-cl",
 ###########################################################
@@ -312,7 +314,7 @@ if __name__ == "__main__":
         # "qtabformer-query-4-key-k-value-ky-mha-4",
         # "qtabformer-query-8-key-k-value-ky-mha-4", #GPU1
         # "qtabformer-query-16-key-k-value-ky-mqa-4", # GPU\ 2
-        "qtabformer-query-1-key-k-value-ky-mqa-4",
+        # "qtabformer-query-1-key-k-value-ky-mqa-4",
         # "qtabformer-query-1-key-k-value-ky-mqa-8", # Need to try head=8
         # "qtabformer-query-4-key-k-value-ky-mqa-4",
         # "qtabformer-query-8-key-k-value-ky-mqa-4", # GPU0
@@ -327,13 +329,17 @@ if __name__ == "__main__":
 
 ###########################################################
         # "qtabformer-query-4-key-k-value-ky-mqa",
-        "qtabformer-query-4-key-k-value-ky-mqa",
+        # "qtabformer-query-4-key-k-value-ky-mqa",
+        # "qtabformer-query-1-key-k-value-ky-mqa-moh",
         "qtabformer-query-4-key-k-value-ky-mqa-moh",
-        "qtabformer-query-4-key-k-value-ky-mqa-d4",
-        "qraugmlp-key-k-value-ky-m96",
-        "qraugmlp-key-k-value-ky-m32",
-        "qraugresnet-key-k-value-ky-m32",
-        "qraugresnet-key-k-value-qky-m32",
+        # "qtabformer-query-4-key-k-value-ky-mqa-moh",
+        # "qtabformer-query-4-key-k-value-ky-mqa-d4",
+        # "qraugmlp-key-k-value-ky-m96",
+        # "qraugmlp-key-k-value-ky-m32",
+        # "qraugresnet-key-k-value-ky-m32",
+        # "qraugresnet-key-k-value-qky-m32",
+
+        # "qraugresnet-key-k-value-qky-m32",
 ###########################################################
         'tabm-piecewiselinear',
         'tabm-mini-piecewiselinear',

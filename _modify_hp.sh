@@ -6,9 +6,10 @@ set -euo pipefail
 # dest_type="qraugmlp-key-k-value-ky-m32"
 # dest_type="qtab-naive-cossim-cl"
 # dest_type="qraugresnet-key-k-value-ky-m32"
-dest_type="qraugresnet-key-k-value-qky-m32"
+# dest_type="qraugresnet-key-k-value-qky-m32"
 
 
+dest_type="qtabformer-query-1-key-k-value-ky-mqa-moh"
 
 find "exp/${dest_type}" -type f -name "0-tuning.toml" -print0 | while IFS= read -r -d '' file; do
   echo "Processing $file"
@@ -58,9 +59,10 @@ find "exp/${dest_type}" -type f -name "0-tuning.toml" -print0 | while IFS= read 
     # [use_label_encoder]=true
     # [k]=1
     # [temperature]=0.1
-    [use_key_as_value]=false
-    [use_qk_as_value]=true
-    [use_skip_connection]=true
+    [query_expansion_ratio]=1
+    # [use_key_as_value]=false
+    # [use_qk_as_value]=true
+    # [use_skip_connection]=true
   )
   for name in "${!params[@]}"; do
     value=${params[$name]}

@@ -53,7 +53,22 @@
                 ],
                 "encoder_n_blocks": 1,
                 "use_multi_output_head": true,
-                "dropout1": [
+                "dropout1": 0.0,
+                "attn_drop": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "proj_drop": [
+                    "_tune_",
+                    "?uniform",
+                    0.0,
+                    0.0,
+                    0.6
+                ],
+                "mlp_drop": [
                     "_tune_",
                     "?uniform",
                     0.0,
@@ -68,9 +83,10 @@
                 "queue_ratio": 64,
                 "d_main": [
                     "_tune_",
-                    "int-power-of-two",
-                    4,
-                    9
+                    "int",
+                    64,
+                    1024,
+                    16
                 ],
                 "d_multiplier": 2.0,
                 "mixer_normalization": "auto",
@@ -124,64 +140,67 @@
             },
             "optimizer": {
                 "type": "AdamW",
-                "lr": 0.0009284283075056913,
+                "lr": 0.0003200514287611486,
                 "weight_decay": 0.0
             },
             "model": {
                 "num_heads": 4,
-                "predictor_n_blocks": 2,
+                "predictor_n_blocks": 1,
                 "encoder_n_blocks": 1,
                 "use_multi_output_head": true,
-                "dropout1": 0.20194977425681146,
+                "dropout1": 0.0,
+                "attn_drop": 0.5552683614969212,
+                "proj_drop": 0.0,
+                "mlp_drop": 0.0,
                 "use_mlp_head": false,
                 "query_expansion_ratio": 4,
                 "attention_type": "mqa",
                 "use_key_as_value": true,
                 "momentum": 0.999,
                 "queue_ratio": 64,
-                "d_main": 32,
+                "d_main": 112,
                 "d_multiplier": 2.0,
                 "mixer_normalization": "auto",
-                "dropout0": 0.5591212373715866,
+                "dropout0": 0.583765012313992,
                 "num_embeddings": {
                     "type": "PeriodicEmbeddings",
-                    "n_frequencies": 85,
-                    "frequency_init_scale": 0.0712799214543427,
-                    "d_embedding": 49,
+                    "n_frequencies": 56,
+                    "frequency_init_scale": 0.04430524428944064,
+                    "d_embedding": 35,
                     "lite": true
                 }
             }
         },
-        "n_parameters": 107280,
+        "n_parameters": 383135,
         "prediction_type": "labels",
         "epoch_size": 40,
-        "best_step": 800,
+        "best_step": 640,
         "metrics": {
             "train": {
-                "rmse": 0.8236998963349816,
-                "mae": 0.6045711040496826,
-                "r2": 0.21631620966409937,
-                "score": -0.8236998963349816
+                "rmse": 0.8203014917997425,
+                "mae": 0.6047847270965576,
+                "r2": 0.22276941042633702,
+                "score": -0.8203014917997425
             },
             "val": {
-                "rmse": 0.8429839223887453,
-                "mae": 0.621684193611145,
-                "r2": 0.1572392647291615,
-                "score": -0.8429839223887453
+                "rmse": 0.8433575953950255,
+                "mae": 0.6248934268951416,
+                "r2": 0.15649194009471812,
+                "score": -0.8433575953950255
             },
             "test": {
-                "rmse": 0.8607831688549835,
-                "mae": 0.629838764667511,
-                "r2": 0.1508503339224394,
-                "score": -0.8607831688549835
+                "rmse": 0.860740443834478,
+                "mae": 0.6334769129753113,
+                "r2": 0.1509347117891624,
+                "score": -0.860740443834478
             }
         },
-        "time": "0:00:43.343106",
+        "time": "0:00:27.377248",
         "chunk_size": null,
         "eval_batch_size": 8192,
-        "trial_id": 92,
-        "tuning_time": "1:03:09.441063"
+        "trial_id": 98,
+        "tuning_time": "0:44:48.148868"
     },
-    "time": "1:07:37.084720",
+    "time": "0:45:12.788374",
     "n_completed_trials": 100
 }

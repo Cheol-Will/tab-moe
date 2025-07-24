@@ -50,13 +50,29 @@ predictor_n_blocks = [
 ]
 encoder_n_blocks = 1
 use_multi_output_head = true
-dropout1 = [
+dropout1 = 0.0
+attn_drop = [
   "_tune_",
   "?uniform",
   0.0,
  0.0,
   0.6,
 ]
+proj_drop = [
+  "_tune_",
+  "?uniform",
+  0.0,
+ 0.0,
+  0.6,
+]
+mlp_drop = [
+  "_tune_",
+  "?uniform",
+  0.0,
+ 0.0,
+  0.6,
+]
+
 use_mlp_head = false
 query_expansion_ratio = 4
 attention_type = "mqa"
@@ -65,9 +81,10 @@ momentum = 0.999
 queue_ratio = 64
 d_main = [
     "_tune_",
-    "int-power-of-two",
-     4,
-     9,
+    "int",
+    64,
+    1024,
+    16
 ]
 d_multiplier = 2.0
 mixer_normalization = "auto"

@@ -77,6 +77,9 @@ class Model(nn.Module):
         num_heads: int = 4,
         query_expansion_ratio: int = 1,
         attention_type: str = 'mha',
+        attn_drop: float = None,
+        proj_drop: float = None,
+        mlp_drop: float = None,
         use_label_encoder: bool = False,
         use_mlp_head: bool = False,
         use_multi_output_head: bool = False,
@@ -91,6 +94,12 @@ class Model(nn.Module):
         if dropout1 == 'dropout0':
             dropout1 = dropout0
         
+        if attn_drop is None:
+            attn_drop = dropout1
+        if proj_drop is None:
+            proj_drop = dropout1
+        if mlp_drop is None:
+            mlp_drop = dropout1
         if n_num_features == 0:
             assert bins is None
             self.num_module = None
@@ -146,9 +155,9 @@ class Model(nn.Module):
                 dim=d_main, 
                 num_heads=num_heads, 
                 attention_type=attention_type,
-                attn_drop=dropout1,
-                proj_drop=dropout1,
-                mlp_drop=dropout1,
+                attn_drop=attn_drop,
+                proj_drop=proj_drop,
+                mlp_drop=mlp_drop,
                 is_first_block=True if i==0 else False,
                 query_expansion_ratio=query_expansion_ratio if i==0 else 1,
             ) for i in range(predictor_n_blocks)]
