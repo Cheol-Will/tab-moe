@@ -156,8 +156,10 @@ class Model(nn.Module):
         activation: str,
         queue_size: int, 
         is_classification: bool,
+        contrastive_loss_weight: float = None,
         distance_metric: str = 'sdp',
         temperature: float = 0.2,
+        temperature_c: float = None,
         candidate_encoding_batch_size: None | int = None,
     ):
         if mixer_normalization == 'auto':
@@ -224,7 +226,9 @@ class Model(nn.Module):
         self.search_index = None
         self.candidate_encoding_batch_size = candidate_encoding_batch_size
         self.temperature = temperature
+        self.temperature_c = temperature if temperature_c is None else temperature_c 
         self.distance_metric = distance_metric
+        self.contrastive_loss_weight = contrastive_loss_weight
         self.reset_parameters()
 
     def reset_parameters(self):
@@ -308,7 +312,7 @@ class Model(nn.Module):
         candidate_k: pre-computed keys for evalaution.
         candidate_y: y label of trainset for evalaution.
         """
-
+        eval_on_train = is_train and not self.training
         x = self._encode(x_num, x_cat) # preprocessing
         query = self.encoder_query(x)
         if self.distance_metric == 'cossim':
@@ -328,13 +332,11 @@ class Model(nn.Module):
             assert candidate_y is None
             candidate_k = self.queue
             candidate_y = self.queue_label
-        else:
-            # During evaluation, use pre-computed candidates set.
-            if is_train:
-                # During eval on train set, add itself and remove later. 
-                assert y is not None
-                candidate_k = torch.cat([key_x, candidate_k])
-                candidate_y = torch.cat([y, candidate_y])
+        if eval_on_train: 
+            # During eval on train set, add itself and remove later. 
+            assert y is not None
+            candidate_k = torch.cat([key_x, candidate_k])
+            candidate_y = torch.cat([y, candidate_y])
         distances = self.distance(query, candidate_k) # scaled dot product or L2 distance
         distances = distances.to(torch.float32)
         if is_train and not self.training:
@@ -356,13 +358,24 @@ class Model(nn.Module):
             # and use nll_loss to calculate the loss
             logits = torch.log(logits+eps)
 
-        if self.training:
-            self._dequeue_and_enqueue(key_x, y) # enqueue current batch
-            
         if logits.ndim == 2:
             logits = logits.unsqueeze(1)
-        return logits
-  
+        
+        if self.contrastive_loss_weight is not None and self.training:
+            loss_pos = torch.einsum("bd,bd->b", query, key_x).unsqueeze(-1)
+            loss_neg = torch.einsum("bd,nd->bn", query, self.queue.clone().detach())
+            logits_c = torch.cat([loss_pos, loss_neg], dim=1)
+            logits_c = logits_c / self.temperature # temperature 2??
+            labels = torch.zeros(logits_c.shape[0], dtype=torch.long, device=logits_c.device)
+            loss = F.cross_entropy(logits_c, labels) * self.contrastive_loss_weight
+
+        if self.training:
+            self._dequeue_and_enqueue(key_x, y) # enqueue current batch
+
+        if self.contrastive_loss_weight is not None and self.training:
+            return logits, loss  
+        else:
+            return logits
 
 class Config(TypedDict):
     seed: int
@@ -481,6 +494,8 @@ def main(
     queue_size_ = min(dataset.size('train'), queue_ratio * batch_size)
     queue_size = (queue_size_ // batch_size) * batch_size
     model_args['queue_size'] = queue_size
+    use_contrastive_loss = True if "contrastive_loss_weight" in config['model'] else False
+
     print(f"Init QTab with {model_args}" )
     model = Model(
         **meta_data,
@@ -522,7 +537,6 @@ def main(
     # Keep the train_indices for Retrieval-based Model
     train_size = dataset.size('train')
     train_indices = torch.arange(train_size, device=device)
-    # eval_candidate_key = torch.randn(train_size, config['model']['d_main'])
 
     def loss_fn(y_pred: Tensor, y_true: Tensor) -> Tensor:
         return _loss_fn(
@@ -633,8 +647,12 @@ def main(
             candidate_y=cand_y,
             is_train=is_train,
         )
-        return pred.squeeze(-1).float()
-
+        if isinstance(pred, tuple):
+            contrastive_loss = pred[1] # already weighted
+            pred = pred[0]
+            return pred.squeeze(-1).float(), contrastive_loss
+        else:
+            return pred.squeeze(-1).float()
 
     @evaluation_mode()
     def evaluate(
@@ -742,7 +760,11 @@ def main(
         )
         for batch_idx in tqdm(batches, desc=f'Epoch {step // epoch_size} Step {step}'):
             optimizer.zero_grad()
-            loss = loss_fn(apply_model('train', batch_idx, True), Y_train[batch_idx])
+            if use_contrastive_loss:
+                pred, loss_c = apply_model('train', batch_idx, True)
+            else:
+                pred = apply_model('train', batch_idx, True)
+            loss = loss_fn(pred, Y_train[batch_idx]) + loss_c
 
             if grad_scaler is None:
                 loss.backward()

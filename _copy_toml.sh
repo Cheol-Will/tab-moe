@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-src_type="qtabformer-query-4-key-k-value-ky-mqa"
-dest_type="qtabformer-query-4-key-k-value-ky-mqa-d4"
+# src_type="qraugmlp-query-key-k-value-ky"
+src_type="qraugresnet-key-k-value-ky-m32"
+# dest_type="qtabformer-query-4-key-k-value-ky-mqa-d4"
+dest_type="qraugresnet-key-k-value-qky-m32"
 
 data_list=("adult" "black-friday" "california" "churn" "covtype2" "diamond" "higgs-small" "house" "microsoft" "otto")
 for dataset in "${data_list[@]}"; do
